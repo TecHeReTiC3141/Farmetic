@@ -1338,10 +1338,10 @@ current_string = ''
 current_interface = 'none'
 
 volume = 80
-pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-main\Home track.mp3')
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
-chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
+chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\Desktop\Farmetic-main\chopping sound 1.wav')
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
@@ -1436,15 +1436,9 @@ at_home = False
 z_z_Z = ''
 main_mob = Mob(0, 0, 'left', [0, 2], [3, 3], 0, 0, True, 5, 0, 0, 0, '', 0, 0, 0, 'none', 'none')
 
-with open(r'C:\Users\User\PycharmProjects\ClearSheet\output.txt.txt', 'r') as configure_file_stream:
-    try:
-        heretic.x = int(configure_file_stream.readline().rstrip().split(' - ')[0])
-        heretic.y = int(configure_file_stream.readline().rstrip().split(' - ')[0])
-        current_location = configure_file_stream.readline().rstrip().split(' - ')[0]
-    except Exception:
-        heretic.x = x_home + 75
-        heretic.y = y_home + 50
-        current_location = 'menu'
+heretic.x = x_home + 75
+heretic.y = y_home + 50
+current_location = 'menu'
 '''
 Создание троп
 '''
@@ -3009,9 +3003,9 @@ Tелепортация
         heretic.attack_time -= 1
     if not volume:
         if current_location == 'leftside':
-            pygame.mixer.music.load(r"C:\Users\User\PycharmProjects\ClearSheet\Leftside Track.mp3")
+            pygame.mixer.music.load(r"C:\Users\User\Desktop\Farmetic-main\Leftside Track.mp3")
             pygame.mixer.music.play(-1)
         elif current_location == 'home':
-            pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+            pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-main\Home track.mp3')
             pygame.mixer.music.play(-1)
         volume = 100
