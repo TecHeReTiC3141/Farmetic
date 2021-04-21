@@ -1,5 +1,4 @@
-import pygame
-import random
+import pygame, random
 
 '''
 TODO:
@@ -84,8 +83,13 @@ class Heretic(object):
         attacked_mob.speed = random.randint(3, 4)
         if not god_mode:
             self.health -= self.strength * 2
-            self.attack_time = self.strength * 40
-            self.half_attack_time = self.strength * 20
+            if isinstance(self.weapon, Weapon):
+                 self.attack_time = self.weapon.speed * 50
+                 self.half_attack_time = self.weapon.speed * 25
+                 self.weapon.blood_marks += random.randint(150, 300)
+            else:
+                self.attack_time = 60
+                self.half_attack_time = 30
         if not random.randint(0, 8) and heretic.strength > 2:
             attacked_mob.stop = True
             attacked_mob.delay = 20
@@ -212,14 +216,14 @@ def produce_new_aggressive_mob():
                                                                         "Острый, но хрупкий",
                                                                         "Основной материал для",
                                                                         "продвинутого оружия"],
-                                                                       random.randint(2, 3), 10, 10),
+                                                                       random.randint(2, 3), 10, 10, 1),
                                         Stick(0, 0, [[0, 0], [0, 0]], [[0, 0], [0, 0]],
                                               "Палка",
                                               ['Заточенный булыжник',
                                                "Острый, но хрупкий",
                                                "Основной материал для",
                                                "продвинутого оружия"],
-                                              random.randint(2, 3), 10, 10)])
+                                              random.randint(2, 3), 10, 10, 2)])
                 strength = 3
                 if isinstance(weapon, Weapon):
                     strength += weapon.strength
@@ -869,6 +873,7 @@ class FallingBlood(Particles):
     def fall(self):
         if not self.life_time:
             decors_list.append(Blood(self.x, self.y, random.randint(15, 30), random.randint(15, 30), 600))
+            decors_list.remove(self)
 
 
 class Torch(Decor):
@@ -1094,7 +1099,7 @@ class GridStone(WorkBenches):
                                                    list(range(tool_y, tool_y + 50))], "Заточенный камень",
                                                   ['Заточенный булыжник', "Острый, но хрупкий",
                                                    "Основной материал для", "продвинутого оружия"],
-                                                  random.randint(2, 3), 10, 10))
+                                                  random.randint(2, 3), 10, 10, 1))
         elif tool == 'pickaxe':
             home_drops_list.append(PickAxe(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
                                                             list(range(tool_y - 50, tool_y + 150))],
@@ -1102,7 +1107,7 @@ class GridStone(WorkBenches):
                                             list(range(tool_y, tool_y + 50))], "Примитивная кирка",
                                            ['Не очень прочная', "Облегчает добычу камня",
                                             "Низкий урон"],
-                                           random.randint(1, 2), 25, 25))
+                                           random.randint(1, 2), 25, 25, 2.5))
 
     def work(self):
         global current_interface
@@ -1131,7 +1136,7 @@ class Button(object):
 
 class Weapon(Drop):
 
-    def __init__(self, w_x, w_y, active_zone, visible_zone, w_type, description, strength, durability, max_durability):
+    def __init__(self, w_x, w_y, active_zone, visible_zone, w_type, description, strength, durability, max_durability, speed, blood_marks=0):
         self.x = w_x
         self.y = w_y
         self.active_zone = active_zone
@@ -1141,6 +1146,8 @@ class Weapon(Drop):
         self.strength = strength
         self.durability = durability
         self.max_durability = max_durability
+        self.speed = speed
+        self.blood_marks = blood_marks
 
     def draw_object(self, obj_x, obj_y):
         pass
@@ -1160,6 +1167,9 @@ class Weapon(Drop):
             self.y += 17
         elif game_tick % 60 == 29:
             self.y -= 17
+
+    def blood_mark(self):
+        self.blood_marks -= 1
 
 
 class Stick(Weapon):
@@ -1199,6 +1209,11 @@ class SharpenedStone(Weapon):
         pygame.draw.polygon(display, (181, 184, 177), ((obj_x + 15, obj_y), (obj_x + 29, obj_y + 11),
                                                        (obj_x + 29, obj_y + 29), (obj_x + 15, obj_y + 39),
                                                        (obj_x, obj_y + 31), (obj_x, obj_y + 15)))
+        if 0 < self.blood_marks < 300:
+            pygame.draw.polygon(display, (200, 0, 0), ((obj_x + 15, obj_y - 1), (obj_x + 30, obj_y + 10),
+                                                 (obj_x + 15, obj_y + 8), (obj_x, obj_y + 10)))
+        if not self.blood_marks % 150 and self.blood_marks:
+            decors_list.append(FallingBlood(obj_x, obj_y, "down", 60))
         if inventory_mode:
             pygame.draw.rect(display, (0, 0, 0), (obj_x - 40, obj_y + 45, 90, 25))
             if self.durability >= self.max_durability // 2:
@@ -1338,10 +1353,11 @@ current_string = ''
 current_interface = 'none'
 
 volume = 80
-pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-main\Home track.mp3')
+pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
-chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\Desktop\Farmetic-main\chopping sound 1.wav')
+chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
+sword_image = pygame.image.load("sword.png")
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
@@ -1436,9 +1452,15 @@ at_home = False
 z_z_Z = ''
 main_mob = Mob(0, 0, 'left', [0, 2], [3, 3], 0, 0, True, 5, 0, 0, 0, '', 0, 0, 0, 'none', 'none')
 
-heretic.x = x_home + 75
-heretic.y = y_home + 50
-current_location = 'menu'
+with open(r'C:\Users\User\PycharmProjects\ClearSheet\output.txt.txt', 'r') as configure_file_stream:
+    try:
+        heretic.x = int(configure_file_stream.readline().rstrip().split(' - ')[0])
+        heretic.y = int(configure_file_stream.readline().rstrip().split(' - ')[0])
+        current_location = configure_file_stream.readline().rstrip().split(' - ')[0]
+    except Exception:
+        heretic.x = x_home + 75
+        heretic.y = y_home + 50
+        current_location = 'menu'
 '''
 Создание троп
 '''
@@ -1803,7 +1825,7 @@ while game:
                                                                [k for k in range(y - 120, y + 180)]],
                                                         [[k for k in range(x - 5, x + 32)], [j for j in range(y - 5,
                                                                                                               y + 50)]],
-                                                        "Палка", ['Крепкая палка'], 2, 20, 20))
+                                                        "Палка", ['Крепкая палка'], 2, 20, 20, 2))
                             trees_list.pop(t_owner)
 
                     elif rock_owner and rock_owner.health and heretic.health:
@@ -1812,7 +1834,8 @@ while game:
                                 heretic.health -= random.randint(4, 6)
                         else:
                             heretic.weapon.mine(rock_owner)
-                        rock_owner.be_broken()
+                        if not heretic.attack_time:
+                            rock_owner.be_broken()
 
                 except IndexError:
                     print('IndexError is caught!')
@@ -2534,8 +2557,7 @@ while game:
                     fog.fly()
                     fog.draw_object(fog.x, fog.y)
                     fog.life_time -= 1
-                    if not fog.life_time:
-                        fog.fall()
+                    fog.fall()
                 if isinstance(fog, Fog) and fog.y < heretic.y - 40:
                     if fog.x in heretic.light_zone[0] and fog.y in heretic.light_zone[1]:
                         fog_colour = (200, 200, 200)
@@ -2749,6 +2771,58 @@ Tелепортация
                 if not fog.life_time:
                     leftside_decors_list.remove(fog)
 
+        if not inventory_mode:
+            for mob in leftside_mobs_list:
+                if isinstance(mob, PeacefulMobs):
+                    if mob.x in heretic.light_zone[0] and mob.y in heretic.light_zone[1]:
+                        mob_head_colour = (255, 228, 196)
+                    else:
+                        mob_head_colour = (255 - day_tick // 10, 228 - day_tick // 10, 196 - day_tick // 10)
+                    if mob.direction == 'up':
+                        pygame.draw.rect(display, mob_head_colour, (mob.x + 15, mob.y - 10, 30, 30))
+                    if mob.direction == 'left' or mob.direction == 'right':
+                        if mob.x in heretic.light_zone[0] and mob.y in heretic.light_zone[1]:
+                            mob_colour = (200, 200, 200)
+                        else:
+                            mob_colour = (200 - day_tick // 10, 200 - day_tick // 10, 200 - day_tick // 10)
+                        pygame.draw.rect(display, mob_colour, (mob.x, mob.y, 90, 60))
+                        if heretic.x in mob.active_zone[0] and heretic.y in mob.active_zone[1]:
+                            pygame.draw.rect(display, (0, 0, 0), (mob.x + 5, mob.y - 30, 80, 20))
+                            pygame.draw.rect(display, (200, 0, 0),
+                                             (mob.x + 7, mob.y - 28, int(76.0 * mob.health / 10.0), 16))
+                    else:
+                        if mob.x in heretic.light_zone[0] and mob.y in heretic.light_zone[1]:
+                            mob_colour = (200, 200, 200)
+                        else:
+                            mob_colour = (200 - day_tick // 10, 200 - day_tick // 10, 200 - day_tick // 10)
+                        pygame.draw.rect(display, mob_colour, (mob.x, mob.y, 60, 90))
+                        if heretic.x in mob.active_zone[0] and heretic.y in mob.active_zone[1]:
+                            pygame.draw.rect(display, (0, 0, 0), (mob.x + 5, mob.y - 30, 50, 20))
+                            pygame.draw.rect(display, (200, 0, 0),
+                                             (mob.x + 7, mob.y - 28, int(46.0 * mob.health / 10.0), 16))
+
+                    if mob.direction == 'down':
+                        pygame.draw.rect(display, mob_head_colour, (mob.x + 15, mob.y + 50, 30, 30))
+                        for i in range(22, 33, 10):
+                            pygame.draw.rect(display, (0, 0, 0), (mob.x + i, mob.y + 60, 5, 5))
+                    elif mob.direction == 'left':
+                        pygame.draw.rect(display, mob_head_colour, (mob.x + 10, mob.y + 15, 30, 30))
+                        for i in range(17, 28, 10):
+                            pygame.draw.rect(display, (0, 0, 0), (mob.x + i, mob.y + 25, 5, 5))
+                    elif mob.direction == 'right':
+                        pygame.draw.rect(display, mob_head_colour, (mob.x + 50, mob.y + 15, 30, 30))
+                        for i in range(57, 68, 10):
+                            pygame.draw.rect(display, (0, 0, 0), (mob.x + i, mob.y + 25, 5, 5))
+
+                    mob.peaceful_exist()
+                elif isinstance(mob, AggressiveMobs):
+                    mob.draw_object()
+                    if len([j for j in mobs_list if isinstance(j, PeacefulMobs)]) or heretic.health > 0:
+                        mob.agressive_exist()
+                    else:
+                        mob.peaceful_exist()
+                mob.bleed()
+
         heretic.draw_object()
         if heretic.y < torch.y - 40:
             torch.draw_object()
@@ -2891,6 +2965,8 @@ Tелепортация
                           [j for j in range(heretic.y - 150 + day_tick // 30, heretic.y + 200 - day_tick // 30)]]
     heretic.visible_zone = [list(range(heretic.x, heretic.x + 76)), list(range(heretic.y, heretic.y + 100))]
     heretic.active_zone = [list(range(heretic.x - 100, heretic.x + 100)), list(range(heretic.y - 90, heretic.y + 120))]
+    if isinstance(heretic.weapon, Weapon) and heretic.weapon.blood_marks:
+        heretic.weapon.blood_mark()
 
     if 900 < tick <= 2700 and not tick % 90:
         x = random.randint(100, 1400)
@@ -2945,8 +3021,17 @@ Tелепортация
                 i.life_time -= 1
                 if not i.life_time:
                     menu_decors_list.remove(i)
-    except (IndexError, ValueError):
-        print('IndexError has been caught')
+    except (ValueError, IndexError) as e:
+        print(e)
+
+    try:
+        for mob in range(len(mobs_list)):
+            if isinstance(mobs_list[mob], AggressiveMobs) and mobs_list[mob].x < 50:
+                mobs_list[mob].x = 1300
+                mobs_list[mob].location = 'leftside'
+                leftside_mobs_list.append(mobs_list.pop(mob))
+    except (ValueError, IndexError) as e:
+        print(e)
 
     for rock in leftside_stones_list:
         rock.regenerate()
@@ -2977,8 +3062,8 @@ Tелепортация
                                                                                                              1])))]
                     drops_list.append(i)
                     heretic.inventory.remove(i)
-        except IndexError:
-            print('problem with drop')
+        except (ValueError, IndexError) as e:
+            print(e)
 
     if heretic.health:
         heretic.is_tired = False
@@ -3003,9 +3088,9 @@ Tелепортация
         heretic.attack_time -= 1
     if not volume:
         if current_location == 'leftside':
-            pygame.mixer.music.load(r"C:\Users\User\Desktop\Farmetic-main\Leftside Track.mp3")
+            pygame.mixer.music.load(r"C:\Users\User\PycharmProjects\ClearSheet\Leftside Track.mp3")
             pygame.mixer.music.play(-1)
         elif current_location == 'home':
-            pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-main\Home track.mp3')
+            pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
             pygame.mixer.music.play(-1)
         volume = 100
