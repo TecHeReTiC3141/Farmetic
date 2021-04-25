@@ -1357,7 +1357,6 @@ pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
 chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
-sword_image = pygame.image.load("sword.png")
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
@@ -1451,16 +1450,10 @@ drop_appear_tick = 500
 at_home = False
 z_z_Z = ''
 main_mob = Mob(0, 0, 'left', [0, 2], [3, 3], 0, 0, True, 5, 0, 0, 0, '', 0, 0, 0, 'none', 'none')
-
-with open(r'C:\Users\User\PycharmProjects\ClearSheet\output.txt.txt', 'r') as configure_file_stream:
-    try:
-        heretic.x = int(configure_file_stream.readline().rstrip().split(' - ')[0])
-        heretic.y = int(configure_file_stream.readline().rstrip().split(' - ')[0])
-        current_location = configure_file_stream.readline().rstrip().split(' - ')[0]
-    except Exception:
-        heretic.x = x_home + 75
-        heretic.y = y_home + 50
-        current_location = 'menu'
+ 
+heretic.x = x_home + 75
+heretic.y = y_home + 50
+current_location = 'menu'
 '''
 Создание троп
 '''
