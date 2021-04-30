@@ -61,11 +61,10 @@ remark_time = 0
 current_string = ''
 
 volume = 80
-pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
-chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
-sword_image = pygame.image.load("sword.png")
+chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\Desktop\Farmetic-master\chopping sound 1.wav')
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
@@ -1806,10 +1805,10 @@ Tелепортация
         heretic.location = current_location
     if not volume:
         if current_location == 'leftside':
-            pygame.mixer.music.load(r"C:\Users\User\PycharmProjects\ClearSheet\Leftside Track.mp3")
+            pygame.mixer.music.load(r"C:\Users\User\Desktop\Farmetic-master\Leftside Track.mp3")
             pygame.mixer.music.play(-1)
         elif current_location == 'home':
-            pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+            pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
             pygame.mixer.music.play(-1)
         volume = 80
     if not game_tick:
