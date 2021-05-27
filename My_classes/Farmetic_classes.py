@@ -16,6 +16,7 @@ pygame.display.set_caption('Farmetic')
 '''
 blood_setting = True
 god_mode = False
+goblins_spawn = True
 
 mobs_directions = ['left', 'right', 'up', 'down']
 mobs_list = []
@@ -24,6 +25,10 @@ trails_list = []
 drops_list = []
 trees_list = []
 leftside_drops_list = []
+crate_image = pygame.image.load("crate.png").convert_alpha()
+crate_image = pygame.transform.scale(crate_image, (crate_image.get_width() * 2, crate_image.get_height() * 2))
+crates_list = []
+regrowing_list = []
 
 home_drops_list = []
 decors_list = []
@@ -40,7 +45,7 @@ BLUE = (0, 0, 200)
 
 
 def print_on_screen(s):
-    if remark_time > 0:
+    if remark_time:
         if isinstance(s, list):
             display.blit(active_font.render(s[remark_time // 60], True, (0, 0, 0)),
                          (heretic.x - 8 * len(s[remark_time // 60]), heretic.y - 75))
@@ -63,7 +68,7 @@ def put_item_in_the_storage(storage, i):
 class Heretic(object):
 
     def __init__(self, h_x, h_y, health, direction, inventory, light_zone, strength, weapon, poison_time, is_tired,
-                 visible_zone, active_zone, location, attack_time=0, half_attack_time=0):
+                 visible_zone, active_zone, location, attack_time=0, half_attack_time=0, backpack=None):
         self.x = h_x
         self.y = h_y
         self.health = health
@@ -79,6 +84,7 @@ class Heretic(object):
         self.location = location
         self.attack_time = attack_time
         self.half_attack_time = half_attack_time
+        self.backpack = backpack
 
     def attack_mob(self, attacked_mob):
         attacked_mob.health -= self.strength
@@ -101,8 +107,10 @@ class Heretic(object):
         if blood_setting:
             for i in range(heretic.strength + 1):
                 blood_y = random.choice(attacked_mob.visible_zone[1])
-                decors_list.append(FallingBlood(random.choice(attacked_mob.visible_zone[0]),
-                                                blood_y, "down", (100 - (blood_y - attacked_mob.y)) // 2))
+                (decors_list if current_location else leftside_decors_list).append(
+                    FallingBlood(random.choice(attacked_mob.visible_zone[0]),
+                                 blood_y, "down", (100 - (blood_y - attacked_mob.y)) // 2,
+                                 heretic.location))
 
         if heretic.x > attacked_mob.x:
             attacked_mob.x -= abs(self.x - attacked_mob.x) // 2
@@ -420,8 +428,12 @@ class AggressiveMobs(Mob):
 
         for i in range(self.strength // 2):
             blood_y = random.choice(self.target.visible_zone[1])
-            decors_list.append(FallingBlood(random.choice(self.target.visible_zone[0]),
-                                            blood_y, "down", (100 - (blood_y - self.target.y)) // 2))
+            if self.location == 'home':
+                decors_list.append(FallingBlood(random.choice(self.target.visible_zone[0]),
+                                                blood_y, "down", (100 - (blood_y - self.target.y)) // 2))
+            elif self.location == 'leftside':
+                leftside_decors_list.append(FallingBlood(random.choice(self.target.visible_zone[0]),
+                                                         blood_y, "down", (100 - (blood_y - self.target.y)) // 2))
 
     def agressive_exist(self):
 
@@ -469,7 +481,27 @@ class AggressiveMobs(Mob):
         elif self.y > 900:
             self.walk_up()
 
+        if tick >= 1800:
+            if not game_tick % 10:
+                self.health -= 1
+
         if self.health <= 0:
+            for loot_item in self.loot:
+                loot_item.x = random.randint(self.x - 50, self.x + 50)
+                loot_item.y = random.randint(self.y - 50, self.y + 50)
+                loot_item.active_zone = [[k for k in range(loot_item.x - 50, loot_item.x + 150)],
+                                         [j for j in range(loot_item.y - 50, loot_item.y + 150)]]
+                loot_item.visible_zone = [[k for k in range(loot_item.x, loot_item.x + 70)],
+                                          [j for j in range(loot_item.y, loot_item.y + 70)]]
+                drops_list.append(loot_item)
+
+            dead_mob_x = random.randint(self.x - 10, self.x + 20)
+            dead_mob_y = random.randint(self.y - 10, self.y + 20)
+            fog_col1 = random.randint(2, 5)
+            for i in range(fog_col1):
+                decors_list.append(Fog(random.randint(dead_mob_x - 50, dead_mob_x + 70),
+                                       random.randint(dead_mob_y - 50, dead_mob_y + 50),
+                                       random.randint(40, 100), random.randint(40, 100), random.randint(120, 180)))
             mobs_list.remove(self)
 
         self.collect_food()
@@ -510,7 +542,7 @@ class AggressiveMobs(Mob):
         if heretic.x in self.active_zone[0] and heretic.y in self.active_zone[1]:
             pygame.draw.rect(display, (0, 0, 0), (self.x + 5, self.y - 30, 50, 20))
             pygame.draw.rect(display, (200, 0, 0),
-                             (self.x + 7, self.y - 28, int(46.0 * self.health / 10.0), 16))
+                             (self.x + 7, self.y - 28, int(46.0 * self.health / 12.0), 16))
 
     def collect_food(self):
         for food in [drop for drop in drops_list if isinstance(drop, Eatable)]:
@@ -572,8 +604,57 @@ class Stump(Tree):
 class Sapling(Tree):
 
     def regrowth(self):
-        trees_list.append(Tree(self.x, self.y, random.randint(8, 13), [[j for j in range(self.x - 120, self.x + 70)],
-                                                                       [k for k in range(self.y - 70, self.y + 100)]]))
+        trees_list.append(
+            Tree(self.x, self.y + 200, random.randint(8, 13), [[j for j in range(self.x - 120, self.x + 270)],
+                                                               [k for k in range(self.y - 70, self.y + 300)]]))
+
+
+class HighGrass:
+
+    def __init__(self, g_x, g_y, active_zone, visible_zone, status, life_time, wind, wind_return=False, location='home'):
+        self.x = g_x
+        self.y = g_y
+        self.active_zone = active_zone
+        self.visible_zone = visible_zone
+        self.status = status
+        self.life_time = life_time
+        self.wind = wind
+        self.wind_return = wind_return
+        self.location = location
+
+    def draw_object(self, obj_x, obj_y):
+        if self.status == 'uncut':
+            for i in range(obj_x, obj_x + 60, 10):
+                pygame.draw.polygon(display, (0, 0, 0), ((i - 1 + self.wind, obj_y + self.wind // 3),
+                                                         (i + 5 + self.wind, obj_y), (i + 5, obj_y + 60),
+                                                         (i, obj_y + 60)), 1)
+                pygame.draw.polygon(display, (96, 185, 66), ((i + self.wind, obj_y + 1 + self.wind // 3),
+                                                         (i + 4 + self.wind, obj_y + 1), (i + 4, obj_y + 60),
+                                                         (i, obj_y + 60)))
+                pygame.draw.polygon(display, (0, 0, 0), ((i + self.wind, obj_y), (i + 3 + self.wind, obj_y - 4),
+                                                         (i + 6 + self.wind, obj_y)))
+                pygame.draw.polygon(display, (96, 185, 66), ((i + self.wind, obj_y + 1), (i + 3 + self.wind, obj_y - 3), (i + 4 + self.wind, obj_y)))
+
+        elif self.status == 'cut':
+            for i in range(obj_x, obj_x + 60, 10):
+                pygame.draw.rect(display, (0, 0, 0), (i - 1, obj_y + 40, 6, 20), 1)
+                pygame.draw.rect(display, (96, 185, 66), (i, obj_y + 41, 4, 19))
+
+        self.flutter()
+
+    def flutter(self):
+
+        if not random.randint(0, 800):
+            self.wind = 1
+        if self.wind and not game_tick % 5:
+            if not self.wind_return:
+                self.wind += 1
+                if self.wind == 15:
+                    self.wind_return = True
+            else:
+                self.wind -= 1
+                if not self.wind:
+                    self.wind_return = False
 
 
 class Rock(object):
@@ -588,6 +669,10 @@ class Rock(object):
         self.type = type
 
     def be_broken(self):
+        if heretic.x < self.x - 10:
+            heretic.direction = "right"
+        elif heretic.x > self.x + 80:
+            heretic.direction = 'left'
         self.health -= 1
         heretic.attack_time = 60
         if self.type == 'general':
@@ -618,7 +703,28 @@ class Rock(object):
                                                 [list(range(stone_x, stone_x + 51)),
                                                  list(range(stone_y, stone_y + 51))],
                                                 "Уголь", ["Небольшой уголек", "Ценное топливо, но", "оставляет следы"],
-                                                0))
+                                                random.randint(8, 10)))
+        elif self.type == 'iron':
+            stone_chance = random.randint(1, 7)
+            if stone_chance <= 2 and self.health:
+                stone_x = random.choice(self.active_zone[0])
+                stone_y = random.choice(self.active_zone[1])
+                leftside_drops_list.append(Stone(stone_x, stone_y, [list(range(stone_x - 50, stone_x + 100)),
+                                                                    list(range(stone_y - 50, stone_y))],
+                                                 [list(range(stone_x, stone_x + 51)),
+                                                  list(range(stone_y, stone_y + 51))],
+                                                 "Камешек", ["Небольшой камень.", "Можно обработать"], 0))
+            elif stone_chance == 6 and self.health:
+                stone_x = random.choice(self.active_zone[0])
+                stone_y = random.choice(self.active_zone[1])
+                leftside_drops_list.append(IronOre(stone_x, stone_y, [list(range(stone_x - 50, stone_x + 100)),
+                                                                      list(range(stone_y - 50, stone_y))],
+                                                   [list(range(stone_x, stone_x + 51)),
+                                                    list(range(stone_y, stone_y + 51))],
+                                                   "Железная руда",
+                                                   ["Рудное железо", "В нем видны", "вкрапления железа",
+                                                    "Можно переплавить", "в слитки"],
+                                                   0))
 
     def draw_object(self):
         pygame.draw.polygon(display, (181, 184, 177),
@@ -626,7 +732,16 @@ class Rock(object):
                              (self.x + 100, self.y + 100),
                              (self.x - 30, self.y + 100)))
         if self.type == 'coal':
-            pygame.draw.line(display, (20, 17, 11), (self.x + 50, self.y + 100 - self.health * 10), (self.x + 30, self.y + 100), self.health * 2)
+            pygame.draw.line(display, (20, 17, 11), (self.x + 40, self.y + 100 - self.health * 10),
+                             (self.x + 30, self.y + 100), self.health * 2)
+            pygame.draw.line(display, (20, 17, 11), (self.x + 50, self.y + 100 - self.health * 10),
+                             (self.x + 60, self.y + 100), self.health + 2)
+
+        elif self.type == 'iron':
+            pygame.draw.line(display, (112, 75, 46), (self.x + 40, self.y + 100 - self.health * 10),
+                             (self.x + 30, self.y + 100), self.health * 2)
+            pygame.draw.line(display, (112, 75, 46), (self.x + 50, self.y + 100 - self.health * 10),
+                             (self.x + 60, self.y + 100), self.health + 2)
 
     def regenerate(self):
         if self.regeneration_time > 0:
@@ -660,7 +775,7 @@ class Berry(object):
 
 class Drop(object):
 
-    def __init__(self, d_x, d_y, active_zone, visible_zone, d_type, description, energy):
+    def __init__(self, d_x, d_y, active_zone, visible_zone, d_type, description, energy, attatched_to_cursor=0):
         self.active_zone = active_zone
         self.visible_zone = visible_zone
         self.x = d_x
@@ -668,6 +783,7 @@ class Drop(object):
         self.type = d_type
         self.description = description
         self.energy = energy
+        self.attached_to_cursor = attatched_to_cursor
 
     def up_down(self):
         if game_tick % 60 == 1:
@@ -694,7 +810,19 @@ class Eatable(Drop):
             heretic.health = 100
 
 
-class Log(Drop):
+class Fuel(Drop):
+
+    def burn(self):
+        pass
+
+
+class Meltable(Drop):
+
+    def melt(self):
+        pass
+
+
+class Log(Fuel):
 
     def print_type(self):
         print(type(self))
@@ -702,6 +830,28 @@ class Log(Drop):
     def draw_object(self, drop_x, drop_y):
         pygame.draw.rect(display, (137, 99, 36), (drop_x, drop_y, 80, 50))
         pygame.draw.ellipse(display, (155, 136, 70), (drop_x - 15, drop_y, 30, 50))
+
+
+class Leather(Drop):
+
+    def draw_object(self, x, y):
+        pygame.draw.polygon(display, (150, 92, 62), ((x, y), (x + 10, y + 10), (x + 15, y + 14),
+                                                     (x + 20, y + 15), (x + 25, y + 14), (x + 30, y + 10),
+                                                     (x + 40, y), (x + 60, y + 10), (x + 55, y + 15), (x + 50, y + 20),
+                                                          (x + 48, y + 25), (x + 47, y + 30), (x + 48, y + 35), (x + 50, y + 41), (x + 60, y + 50),
+                                                          (x + 40, y + 60), (x + 30, y + 50), (x + 25, y + 46),
+                                                          (x + 20, y + 45), (x + 15, y + 46), (x + 10, y + 50), (x, y + 60),
+                                                          (x - 20, y + 50), (x - 10, y + 41), (x - 8, y + 35), (x - 7, y + 30),
+                                                          (x - 8, y + 25), (x - 10, y + 20), (x - 15, y + 15), (x - 20, y + 10)))
+
+
+class Wool(Drop):
+
+    def draw_object(self, x, y):
+        pygame.draw.polygon(display, (200, 200, 200), ((x, y), (x + 30, y - 5), (x + 60, y),
+                                                       (x + 52, y + 30), (x + 35, y + 20), (x + 25, y + 20), (x + 8, y + 30)))
+        for i in range(y + 3, y + 20, 6):
+            pygame.draw.lines(display, (160, 160, 160), False, ((x + 5, i + 5), (x + 30, i), (x + 55, i + 5)), 2)
 
 
 class Stone(Drop):
@@ -712,14 +862,30 @@ class Stone(Drop):
         pygame.draw.rect(display, (158, 158, 158), (drop_x, drop_y + 25, 40, 15))
 
 
-class Coal(Drop):
+class Coal(Fuel):
 
     def draw_object(self, drop_x, drop_y):
         pygame.draw.rect(display, (20, 17, 11), (drop_x, drop_y, 15, 10))
         pygame.draw.rect(display, (20, 17, 11), (drop_x + 5, drop_y + 10, 40, 25))
 
 
-class Pine(Drop):
+class IronOre(Meltable):
+
+    def draw_object(self, drop_x, drop_y):
+        pygame.draw.rect(display, (0, 0, 0), (drop_x - 1, drop_y - 1, 42, 42))
+        pygame.draw.rect(display, (181, 184, 177), (drop_x, drop_y, 40, 40))
+        pygame.draw.rect(display, (158, 158, 158), (drop_x, drop_y + 25, 40, 15))
+        for i in range(drop_x + 5, drop_x + 35, 10):
+            pygame.draw.line(display, (112, 75, 46), (i, drop_y + 2), (i + 5, drop_y + 20), 5)
+
+
+class IronIngot(Drop):
+
+    def draw_object(self, drop_x, drop_y):
+        pygame.draw.rect(display, (89, 93, 110), (drop_x, drop_y, 50, 20))
+
+
+class Pine(Fuel):
 
     def draw_object(self, drop_x, drop_y):
         pygame.draw.rect(display, (112, 68, 36), (drop_x, drop_y, 50, 30))
@@ -758,7 +924,7 @@ def poison():
     heretic.poison_time = 600
 
 
-class RawMeat(Eatable):
+class RawMeat(Eatable, Meltable):
 
     def draw_object(self, drop_x, drop_y):
         pygame.draw.ellipse(display, (168, 33, 0), (drop_x, drop_y, 70, 40))
@@ -828,7 +994,7 @@ class Fog(Decor):
         print(type(self))
 
     def fly(self):
-        self.x += 1
+        self.x += random.randint(1, 2)
 
 
 class Blood(Decor):
@@ -866,11 +1032,12 @@ class Steps(Decor):
 
 class Particles:
 
-    def __init__(self, p_x, p_y, p_direction, p_life_time):
+    def __init__(self, p_x, p_y, p_direction, p_life_time, location='home'):
         self.x = p_x
         self.y = p_y
         self.direction = p_direction
         self.life_time = p_life_time
+        self.location = location
 
     def fly(self):
 
@@ -885,6 +1052,8 @@ class Particles:
 
         elif 'right' in self.direction:
             self.x += 1
+        if self.life_time <= 0:
+            decors_list.remove(self)
 
     def draw_object(self, obj_x, obj_y):
         pass
@@ -916,10 +1085,23 @@ class FallingBlood(Particles):
             decors_list.remove(self)
 
 
+class FallingLeaves(Particles):
+
+    def draw_object(self, obj_x, obj_y):
+        pygame.draw.rect(display, (52, 152, 56), (obj_x, obj_y, random.randint(7, 9), random.randint(6, 7)))
+
+
 class Torch(Decor):
 
+    def __init__(self, p_x, p_y, p_direction, p_life_time, active_zone):
+        self.x = p_x
+        self.y = p_y
+        self.direction = p_direction
+        self.life_time = p_life_time
+        self.active_zone = active_zone
+
     def work(self):
-        if day_tick > 200:
+        if self.life_time:
             pygame.draw.circle(display, (90, 100, 95), (self.x + 12, self.y + 60), 150 - (day_tick - 450) // 15)
             pygame.draw.circle(display, (100, 110, 105), (self.x + 12, self.y + 60), 110 - (day_tick - 450) // 15)
             smoke_chance = random.randint(0, 150)
@@ -932,12 +1114,24 @@ class Torch(Decor):
         pygame.draw.polygon(display, (137, 99, 36), ((self.x + 3, self.y - 25), (self.x + 8, self.y + 45),
                                                      (self.x + 19, self.y + 45), (self.x + 22, self.y - 25)))
         pygame.draw.circle(display, (0, 0, 0), (self.x + 12, self.y - 25), 13)
-        if day_tick > 200:
+        if self.life_time:
             pygame.draw.ellipse(display, (219, 144, 31),
                                 (self.x - 5 + tick % 30 // 9, self.y - 52 + tick % 25 // 8, 35, 45))
             pygame.draw.circle(display, (200, 0, 0), (self.x + 12, self.y - 25), 13)
             pygame.draw.polygon(display, (200, 0, 0), ((self.x + 1, self.y - 25), (self.x + 24, self.y - 25),
                                                        (self.x + 12, self.y - 50)))
+            self.life_time -= 1
+
+    def light(self):
+        if len([i for i in heretic.inventory if isinstance(i, Coal)]):
+            self.life_time += 1800
+            for i in heretic.inventory:
+                if isinstance(i, Coal):
+                    heretic.inventory.remove(i)
+        else:
+            global current_string, remark_time
+            current_string = 'Нужен уголек'
+            remark_time = 60
 
 
 '''
@@ -955,7 +1149,7 @@ class Bed(object):
 
 class WorkBenches(object):
 
-    def __init__(self, w_x, w_y, active_zone, work_time, status, current_product=None):
+    def __init__(self, w_x, w_y, active_zone, work_time, status, current_product=None, fuel=0):
 
         self.x = w_x
         self.y = w_y
@@ -963,6 +1157,7 @@ class WorkBenches(object):
         self.work_time = work_time
         self.status = status
         self.product = current_product
+        self.fuel = fuel
 
     def work(self):
         if self.work_time >= 0:
@@ -1004,128 +1199,78 @@ class JuiceMaker(WorkBenches):
 
 class Furnace(WorkBenches):
 
-    def produce_meat(self):
-        self.status = 'off'
+    def produce(self):
         m_x = self.x + 15
         m_y = self.y + 10
-        home_drops_list.append(Meat(m_x, m_y, [list(range(m_x - 50, m_x + 150)), list(range(m_y - 50, m_y + 150))],
-                                    [list(range(m_x, m_x + 50)), list(range(m_y, m_y + 50))], "Жареное мясо",
-                                    ['Вкусный еще теплый', 'кусок жареного мяса'], random.randint(20, 25)))
+        act_zone = [list(range(m_x - 50, m_x + 150)), list(range(m_y - 50, m_y + 150))]
+        vis_zone = [list(range(m_x, m_x + 50)), list(range(m_y, m_y + 50))]
+        if self.status == 'Сырое мясо':
+            self.product = Meat(m_x, m_y, act_zone, vis_zone, "Жареное мясо",
+                                ['Вкусный еще теплый', 'кусок жареного мяса'], random.randint(20, 25))
+        elif self.status == "Железная руда":
+            self.product = IronIngot(m_x, m_y, act_zone, vis_zone, "Слиток железа",
+                                     ['Неровный слиток', 'Основной материал', "для железных орудий"], 0)
 
-    def make_meat(self):
+        self.status = 'off'
+        self.work_time = 0
+
+    def melt_something(self, stat):
         global remark_time, current_string
-        if len([i for i in heretic.inventory if isinstance(i, RawMeat)]) and len([i for i in heretic.inventory
-                                                                                  if isinstance(i, Log)]):
-            self.work_time = 600
-            remark_time = 60
-            current_string = 'Вскоре все приготовится'
-            if self.status == 'off':
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], RawMeat):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], Log):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
+        self.work_time = 600
+        self.status = stat
+        self.work()
 
-            elif self.status == 'meat':
-
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], Log):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-
-            elif self.status == 'fuel':
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], RawMeat):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-
-            self.status = 'on'
-
-        elif len([i for i in heretic.inventory if isinstance(i, RawMeat)]):
-
-            if self.status == 'off':
-                self.status = 'meat'
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], RawMeat):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-
-            elif self.status == 'fuel':
-                self.status = 'on'
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], RawMeat):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-                self.work_time = 600
-                remark_time = 60
-                current_string = 'Вскоре все приготовится'
-
+    def work(self):
+        if self.work_time >= 0 and self.fuel:
+            if sleeping and not self.work_time % 3:
+                self.work_time -= 3
             else:
-                remark_time = 60
-                current_string = 'Здесь уже есть мясо'
+                self.work_time -= 1
+            if not self.work_time % 60 and self.fuel and self.work_time:
+                self.fuel -= 1
+            if not self.work_time:
+                self.produce()
 
-        elif len([i for i in heretic.inventory if isinstance(i, Log)]):
+    def start_work(self):
+        self.status = 'off'
+        global current_interface
+        current_interface = 'furnace'
 
-            if self.status == 'off':
-                self.status = 'fuel'
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], Log):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-                remark_time = 60
-                current_string = "Нужно мясо"
+    def draw_object(self, x, y):
+        pygame.draw.rect(display, (89, 94, 100), (x, y, 100, 100))
+        pygame.draw.polygon(display, (20, 20, 20),
+                            ((x + 20, y + 35), (x + 35, y + 15), (x + 65, y + 15), (x + 80, y + 35)))
+        pygame.draw.rect(display, (181, 184, 177), (x + 2, y + 40, 96, 58))
+        pygame.draw.polygon(display, (20, 20, 20),
+                            ((x + 10, y + 90), (x + 20, y + 65), (x + 30, y + 55), (x + 70, y + 55), (x + 80, y + 65),
+                             (x + 90, y + 90)))
+        if self.status != 'off':
+            pygame.draw.circle(display, (190, 0, 10), (x + 50, y + 65), 20 + self.work_time % 60 // 12)
+            pygame.draw.circle(display, (200, 143, 25), (x + 50, y + 65), 10 + self.work_time % 60 // 15)
 
-            elif self.status == 'meat':
-                self.status = 'on'
-                for j in range(len(heretic.inventory)):
-                    try:
-                        if isinstance(heretic.inventory[j], Log):
-                            heretic.inventory.pop(j)
-                            break
-                    except IndexError:
-                        print('error with furnace')
-                self.work_time = 600
-                remark_time = 60
-                current_string = 'Скоро все будет готово'
+            pygame.draw.rect(display, (181, 184, 177), (x + 2, y + 40, 96, 15))
 
+    def alternate_draw_object(self, x, y):
+        pygame.draw.line(display, (170, 161, 161), (x + 30, y + 65),
+                         (x + 10, y + 90), 15)
+        pygame.draw.line(display, (170, 161, 161), (x + 70, y + 65),
+                         (x + 90, y + 90), 15)
+        pygame.draw.ellipse(display, (142, 47, 41), (x, y, 100, 75))
+        pygame.draw.ellipse(display, (0, 0, 0), (x + 5, y + 5, 90, 50))
+        if self.status == 'on':
+            pygame.draw.ellipse(display, (216, 118, 49), (x + 10, y + 8, 80, 44))
+        for i in range(y + 10, y + 46, 7):
+            if i == y + 10 or i == y + 45:
+                pygame.draw.line(display, (170, 161, 161), (x + 30, i), (x + 70, i), 4)
+            elif i == y + 17 or i == y + 38:
+                pygame.draw.line(display, (170, 161, 161), (x + 10, i), (x + 90, i), 4)
             else:
-                remark_time = 60
-                current_string = 'Здесь уже есть топливо'
-
-        else:
-            if self.status == 'meat':
-                remark_time = 60
-                current_string = 'Нужно дерево'
-            elif self.status == 'fuel':
-                remark_time = 60
-                current_string = 'Нужно мясо'
-            elif self.status == 'off':
-                remark_time = 60
-                current_string = 'Нужно дерево и мясо'
+                pygame.draw.line(display, (170, 161, 161), (x + 5, i), (x + 95, i), 4)
+        if self.status == 'meat':
+            pygame.draw.ellipse(display, (168, 33, 0), (x + 15, y + 10, 70, 40))
+        elif self.status == 'on':
+            pygame.draw.ellipse(display, (168 - (600 - self.work_time) // 7, 33 - (600 - self.work_time)
+                                          // 20, 0), (self.x + 15, self.y + 10, 70, 40))
 
 
 class GridStone(WorkBenches):
@@ -1134,21 +1279,66 @@ class GridStone(WorkBenches):
         tool_x = random.choice(self.active_zone[0])
         tool_y = random.choice(self.active_zone[1])
         if tool == 'sharpened stone':
-            home_drops_list.append(SharpenedStone(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
-                                                                   list(range(tool_y - 50, tool_y + 150))],
-                                                  [list(range(tool_x, tool_x + 50)),
-                                                   list(range(tool_y, tool_y + 50))], "Заточенный камень",
-                                                  ['Заточенный булыжник', "Острый, но хрупкий",
-                                                   "Основной материал для", "продвинутого оружия"],
-                                                  random.randint(2, 3), 10, 10, 1))
+            if len([i for i in heretic.inventory if isinstance(i, Stone)]) >= 2:
+                home_drops_list.append(SharpenedStone(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
+                                                                       list(range(tool_y - 50, tool_y + 150))],
+                                                      [list(range(tool_x, tool_x + 50)),
+                                                       list(range(tool_y, tool_y + 50))], "Заточенный камень",
+                                                      ['Заточенный булыжник', "Острый, но хрупкий",
+                                                       "Основной материал для", "продвинутого оружия"],
+                                                      random.randint(2, 3), 10, 10, 1))
+                count = 0
+                for i in heretic.inventory:
+                    if isinstance(i, Stone):
+                        heretic.inventory.remove(i)
+                        count += 1
+                        if count == 2:
+                            break
+            else:
+                self.status = 'not enough resources'
+
         elif tool == 'pickaxe':
-            home_drops_list.append(PickAxe(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
-                                                            list(range(tool_y - 50, tool_y + 150))],
-                                           [list(range(tool_x, tool_x + 50)),
-                                            list(range(tool_y, tool_y + 50))], "Примитивная кирка",
-                                           ['Не очень прочная', "Облегчает добычу камня",
-                                            "Низкий урон"],
-                                           random.randint(1, 2), 25, 25, 2.5))
+            if len([i for i in heretic.inventory if isinstance(i, Stone)]) >= 2 and \
+                    len([i for i in heretic.inventory if isinstance(i, Log)]):
+                home_drops_list.append(PickAxe(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
+                                                                list(range(tool_y - 50, tool_y + 150))],
+                                               [list(range(tool_x, tool_x + 50)),
+                                                list(range(tool_y, tool_y + 50))], "Примитивная кирка",
+                                               ['Не очень прочная', "Облегчает добычу камня",
+                                                "Низкий урон"],
+                                               random.randint(1, 2), 25, 25, 2.5))
+                count = 0
+                for i in heretic.inventory:
+                    if isinstance(i, Stone):
+                        heretic.inventory.remove(i)
+                        count += 1
+                        if count == 2:
+                            break
+                for i in heretic.inventory:
+                    if isinstance(i, Log):
+                        heretic.inventory.remove(i)
+                        break
+            else:
+                self.status = 'not enough resources'
+
+        elif tool == 'shovel':
+            home_drops_list.append(Shovel(tool_x, tool_y, [list(range(tool_x - 50, tool_x + 150)),
+                                                           list(range(tool_y - 50, tool_y + 150))],
+                                          [list(range(tool_x, tool_x + 50)),
+                                           list(range(tool_y, tool_y + 50))], "Лопата",
+                                          ['Позволяет делать', "тропинки или что-нибудь",
+                                           "закопать"],
+                                          random.randint(2, 3), 15, 15, 2.5))
+
+        elif tool == 'crate':
+            heretic.inventory.append(Crate(0, 0, 0, 0, [], 8, 0, 0, 'Ящик'))
+
+        elif tool == 'bag':
+            home_drops_list.append(Bag(tool_x, tool_y, 70, 60, [], 4,
+                                       [list(range(tool_x - 50, tool_x + 150)), list(range(tool_y - 50, tool_y + 150))],
+                                       [list(range(tool_x, tool_x + 50)),
+                                        list(range(tool_y, tool_y + 70))], 'Сумка',
+                                       description=['Небольщая кожаная', "сумка. Содержимое:", "Пусто"]))
 
     def work(self):
         global current_interface
@@ -1302,6 +1492,40 @@ class PickAxe(Weapon):
                         random.choice(["right", "left"]) + " " + "up", random.randint(35, 40)))
 
 
+class Shovel(Weapon):
+
+    def draw_object(self, obj_x, obj_y):
+        pygame.draw.rect(display, (137, 99, 36), (obj_x + 5, obj_y + 30, 10, 40))
+        pygame.draw.rect(display, (181, 186, 177), (obj_x, obj_y + 7, 20, 23))
+        pygame.draw.rect(display, (127, 89, 26), (obj_x, obj_y + 70, 20, 5))
+        pygame.draw.circle(display, (181, 186, 177), (obj_x + 10, obj_y + 10), 10)
+        if inventory_mode:
+            pygame.draw.rect(display, (0, 0, 0), (obj_x - 40, obj_y + 45, 90, 25))
+            if self.durability >= self.max_durability // 2:
+                pygame.draw.rect(display, (0, 200, 0), (obj_x - 39, obj_y + 46,
+                                                        int(88 * float(self.durability) / self.max_durability), 23))
+            elif self.max_durability // 5 <= self.durability <= self.max_durability // 2:
+                pygame.draw.rect(display, (150, 150, 0), (obj_x - 39, obj_y + 46,
+                                                          int(88 * float(self.durability) / self.max_durability), 23))
+            else:
+                pygame.draw.rect(display, (200, 0, 0), (obj_x - 39, obj_y + 46,
+                                                        int(88 * float(self.durability) / self.max_durability), 23))
+
+    def dig(self):
+        trails_list.append(Trail(heretic.x + 5, heretic.y + 80, "left", 60, 60, [list(range(heretic.x, heretic.y + 61)),
+                                                                                 list(range(heretic.y + 75,
+                                                                                            heretic.y + 136))],
+                                 [list(range(heretic.x, heretic.y + 61)),
+                                  list(range(heretic.y + 75, heretic.y + 136))],
+                                 [[str(j) + " " + str(k) for j in range(heretic.x, heretic.x + 61, 10)] for k in
+                                  range(heretic.y + 75, heretic.y + 136,
+                                        10)], []))
+        heretic.health -= 5
+        self.durability -= 1
+        if not self.durability:
+            heretic.weapon = 'none'
+
+
 def close():
     global current_interface
 
@@ -1310,7 +1534,10 @@ def close():
 
 class Storage(object):
 
-    def __init__(self, s_x, s_y, s_length, s_width, storage, max_capability, active_zone, visible_zone):
+    def __init__(self, s_x, s_y, s_length, s_width, storage, max_capability, active_zone, visible_zone, type,
+                 location='home', description=None):
+        if not description:
+            description = ['Хранилище']
         self.x = s_x
         self.y = s_y
         self.length = s_length
@@ -1319,6 +1546,9 @@ class Storage(object):
         self.max_capability = max_capability
         self.active_zone = active_zone
         self.visible_zone = visible_zone
+        self.type = type
+        self.location = location
+        self.description = description
 
     def open(self):
         global current_interface
@@ -1363,6 +1593,45 @@ class Chest(Storage):
                                                        30, 30))
 
 
+class Crate(Storage):
+    @staticmethod
+    def draw_object(obj_x, obj_y):
+        display.blit(crate_image, crate_image.get_rect(center=(obj_x + 34, obj_y + 34)))
+
+    def set(self):
+        crates_list.append(Crate(heretic.x + 15, heretic.y + 30, 68, 68, [], 8,
+                                 [list(range(heretic.x - 85, heretic.x + 115)),
+                                  list(range(heretic.y - 50, heretic.y + 50))],
+                                 [list(range(heretic.x + 15, heretic.x + 83)),
+                                  list(range(heretic.y + 30, heretic.y + 98))], "Ящик", current_location))
+        heretic.inventory.remove(self)
+
+
+class BackPack(Storage):
+
+    def equip(self):
+        if heretic.backpack:
+            x = random.randint(heretic.x - 50, heretic.x + 100)
+            y = random.randint(heretic.y + 10, heretic.y + 120)
+            heretic.backpack.x = x
+            heretic.backpack.y = y
+            heretic.backpack.active_zone = [list(range(x - 150, x + 150)),
+                                            list(range(y - 150, y + 150))]
+            (drops_list if heretic.location == 'home' else leftside_drops_list).append(heretic.backpack)
+        heretic.backpack = self
+
+
+class Bag(BackPack, Drop):
+
+    def draw_object(self, x, y):
+        pygame.draw.rect(display, (161, 112, 51), (x, y, 50, 70))
+        pygame.draw.lines(display, (161, 112, 51), True, ((x, y), (x + 40, y - 15), (x + 60, y + 10)), 8)
+        pygame.draw.polygon(display, (169, 82, 44),
+                            ((x - 2, y), (x - 2, y + 25), (x + 25, y + 35), (x + 52, y + 25), (x + 52, y)))
+
+        pygame.draw.circle(display, (0, 0, 0), (x + 25, y + 29), 3)
+
+
 class Sign(object):
 
     def __init__(self, sign_x, sign_y, sign_direction, sign_description, active_zone):
@@ -1402,7 +1671,6 @@ pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
 chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
-sword_image = pygame.image.load("sword.png")
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
