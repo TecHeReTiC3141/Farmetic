@@ -1,19 +1,24 @@
-import pygame, random
-from My_classes.Farmetic_classes import AggressiveMobs, Mob, PeacefulMobs, Heretic, heretic, current_location, current_interface, current_string, remark_time, \
+import pygame
+import random
+
+from My_classes.Farmetic_classes import AggressiveMobs, Mob, PeacefulMobs, Heretic, heretic, current_interface, \
     mobs_directions, mobs_list, bushes_list, trails_list, drops_list, trees_list, leftside_drops_list, home_drops_list, \
-    decors_list, leftside_decors_list, \
+    decors_list, leftside_decors_list, crates_list, regrowing_list, \
     leftside_stones_list, leftside_mobs_list, menu_decors_list, \
-    produce_new_peaceful_mob, produce_new_aggressive_mob, print_on_screen, print_for_mob,\
-    Trail, Bush, Tree, Stump, Sapling, Rock, Drop, Eatable, Log, Stone, Pine, Berry, DroppedBerry, Juice, RawMeat, Meat, \
-    House, Decor, Stones, Fog, Blood, Smoke, Steps, Torch, Particles, Flashes, FallingBlood, Powder, Bed, WorkBenches, \
-    JuiceMaker, GridStone, Furnace, Weapon, Sword, Stick, PickAxe, SharpenedStone, Storage, Chest, Sign, \
-    blood_setting, tick, day_tick, game_tick, sleeping, home, x_home, y_home, h_length, h_width, at_home
+    produce_new_peaceful_mob, produce_new_aggressive_mob, print_for_mob, print_on_screen, \
+    Trail, Bush, Tree, Stump, Sapling, HighGrass, Rock, Drop, Fuel, Meltable, Eatable, Log, Stone, Coal, IronOre, IronIngot, Pine, \
+    Berry, DroppedBerry, Juice, RawMeat, Meat, \
+    House, Decor, Stones, Fog, Blood, Smoke, Steps, Torch, Particles, Flashes, FallingBlood, FallingLeaves, Powder, Bed, \
+    WorkBenches, \
+    JuiceMaker, GridStone, Furnace, Weapon, Sword, Stick, PickAxe, SharpenedStone, Shovel, Storage, Chest, Crate, \
+    BackPack, Bag, Sign, \
+    blood_setting, tick, day_tick, sleeping, home, x_home, y_home, h_length, h_width
+import My_classes.Farmetic_classes
 
 '''
 TODO:
 Доработать режим Бога
-Добавить все классы из Farmetic_classes !!!!!!
-
+Добавить ящики, которые можно создавать и ставить !!
 
 '''
 pygame.init()
@@ -26,12 +31,9 @@ bloor_surf.set_alpha(15)
 sign_surf.set_alpha(150)
 pygame.display.set_caption('Farmetic')
 
-
 '''
 Настройки
 '''
-
-god_mode = False
 
 game = True
 GREEN = (0, 200, 0)
@@ -52,19 +54,18 @@ def open(bench):
 
 
 def close():
-
     global current_interface
     current_interface = 'none'
 
 
-remark_time = 0
-current_string = ''
-
 volume = 80
-pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
+pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
-chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\Desktop\Farmetic-master\chopping sound 1.wav')
+chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
+sword_image = pygame.image.load("sword.png")
+crate_image = pygame.image.load("crate.png").convert_alpha()
+crate_image = pygame.transform.scale(crate_image, (crate_image.get_width() * 2, crate_image.get_height() * 2))
 
 directions = ['vert', 'gor']
 drop_type = ['Аптечка', 'Броня', 'Оружие']
@@ -91,12 +92,12 @@ sign_to_home = Sign(1300, 400, "right", ["Поляна", "Место, где н�
 bed = Bed(310, 160, [[i for i in range(300, 400)], [j for j in range(160, 270)]])
 juicemaker = JuiceMaker(550, 160, [[i for i in range(500, 650)], [j for j in range(160, 240)]], -1, 'none')
 furnace = Furnace(700, 160, [[i for i in range(700, 800)], [j for j in range(160, 260)]], -1, 'off')
-torch = Torch(1200, 350, 0, 0, -1)
+torch = Torch(1200, 350, 0, 0, [list(range(1100, 1300)), list(range(290, 400))])
 chest = Chest(850, 160, 120, 100, [], 20, [list(range(840, 980)), list(range(150, 260))],
-              [list(range(850, 970)), list(range(160, 260))])
+              [list(range(850, 970)), list(range(160, 260))], 'Сундук')
 gridstone = GridStone(980, 330, [list(range(940, 1050)), list(range(300, 420))], -1, 'off')
 
-gridstone_recipes = ['Заточ. камень', "Копье", "Топор", "Кирка"]
+gridstone_recipes = ['Заточ. камень', "Копье", "Топор", "Кирка", "Лопата", 'Ящик', 'Сумка', "Щипцы", "Пластина"]
 
 clock = pygame.time.Clock()
 active_font = pygame.font.Font(None, 60)
@@ -126,7 +127,6 @@ eat_time = 0
 energy_boost = ''
 drop_active = False
 home_active = False
-inventory_mode = False
 chopping_active = False
 on_path = False
 tp_to_left_side = False
@@ -137,13 +137,18 @@ d_owner = None
 t_owner = None
 m_owner = None
 rock_owner = None
+crate_owner = None
 menu_tick = 0
 day_return = False
 drop_appear_tick = 500
 z_z_Z = ''
 main_mob = Mob(0, 0, 'left', [0, 2], [3, 3], 0, 0, True, 5, 0, 0, 0, '', 0, 0, 0, 'none', 'none')
-heretic.x = x_home + 105
+current_attached = None
+current_mean = 0
+heretic.x = x_home + 155
 heretic.y = y_home + 50
+settings = {"Кровь": blood_setting, "Режим Бога": My_classes.Farmetic_classes.god_mode,
+            "Спавн гоблинов": My_classes.Farmetic_classes.goblins_spawn}
 
 '''
 Создание троп
@@ -206,12 +211,21 @@ for i in range(random.randint(5, 7)):
 """
 Создание булыжников
 """
-for i in range(random.randint(5, 8)):
+for i in range(random.randint(7, 10)):
     x = random.randint(100, 1300)
     y = random.randint(100, 800)
     leftside_stones_list.append(Rock(x, y, 10, [list(range(x - 50, x + 150)), list(range(y - 50, y + 150))],
                                      [list(range(x - 30, x + 100)), list(range(y, y + 100))], 900,
-                                     random.choice(['general', 'general', 'general', 'coal', 'coal', 'iron'])))
+                                     random.choice(['general', 'general', 'coal', 'coal', 'iron'])))
+
+'''
+Создание трав и других растущих структур(в разработке)
+'''
+for i in range(random.randint(5, 7)):
+    x = random.randint(100, 1300)
+    y = random.randint(100, 800)
+    regrowing_list.append(HighGrass(x, y, [list(range(x - 50, x + 150)), list(range(y - 50, y + 150))],
+                                    [list(range(x, x + 60)), list(range(y, y + 60))], 'uncut', 0, 0))
 
 while game:
     pos = pygame.mouse.get_pos()
@@ -226,7 +240,7 @@ while game:
             '''
 
             if event.button == 2:
-                if not inventory_mode:
+                if not My_classes.Farmetic_classes.inventory_mode:
                     trails_list = []
                     for i in range(random.randint(4, 6)):
                         trails_direction = random.choice(directions)
@@ -273,93 +287,165 @@ while game:
                                 trees_list[tree], trees_list[tree2] = trees_list[tree2], trees_list[tree]
             elif event.button == 1:
 
-                if current_location == 'menu':
+                if My_classes.Farmetic_classes.current_location == 'menu':
                     if 450 <= event.pos[0] <= 950 and menu_tick > 600:
                         if 290 <= event.pos[1] <= 400:
-                            current_location = 'home'
+                            My_classes.Farmetic_classes.current_location = 'home'
                         elif 570 <= event.pos[1] <= 680:
                             pygame.quit()
                         elif 430 <= event.pos[1] <= 540:
-                            current_location = 'settings'
+                            My_classes.Farmetic_classes.current_location = 'settings'
 
-                elif current_location == 'settings':
+                elif My_classes.Farmetic_classes.current_location == 'settings':
                     if 600 <= event.pos[0] <= 750:
                         if 250 <= event.pos[1] <= 300:
+                            settings["Кровь"] = not settings["Кровь"]
                             blood_setting = not blood_setting
                         elif 380 <= event.pos[1] <= 430:
-                            god_mode = not god_mode
+                            My_classes.Farmetic_classes.god_mode = not My_classes.Farmetic_classes.god_mode
+                            settings["Режим Бога"] = not settings["Режим Бога"]
 
-                elif current_interface == 'gridstone':
-                    if 10 <= event.pos[0] <= 310:
-                        recipy = (event.pos[1] - 10) // 110
-                        if recipy == 0:
-                            gridstone.status = 'sharpened stone'
-                            gridstone.product = SharpenedStone(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-                        elif recipy == 3:
-                            gridstone.status = 'pickaxe'
-                            gridstone.product = PickAxe(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-
-                    elif 720 <= event.pos[0] <= 970 and 700 <= event.pos[1] <= 800:
-                        gridstone.produce_tools(gridstone.status)
+                        elif 460 <= event.pos[1] <= 510:
+                            My_classes.Farmetic_classes.goblins_spawn = not My_classes.Farmetic_classes.goblins_spawn
+                            settings["Спавн гоблинов"] = not settings["Спавн гоблинов"]
 
                 if isinstance(m_owner, Mob) and event.pos[0] in m_owner.visible_zone[0] and event.pos[1] in \
-                        m_owner.visible_zone[1] and not heretic.is_tired and not inventory_mode and not heretic.attack_time:
+                        m_owner.visible_zone[
+                            1] and not heretic.is_tired and not My_classes.Farmetic_classes.inventory_mode and not heretic.attack_time:
                     heretic.attack_mob(m_owner)
 
-                elif drop_active and len(heretic.inventory) < 20 and not at_home:
+                elif drop_active and len(heretic.inventory) < 20 and not My_classes.Farmetic_classes.at_home:
                     picked_up_time = 60
-                    if current_location == 'home':
+                    if My_classes.Farmetic_classes.current_location == 'home':
+                        if isinstance(drops_list[d_owner], BackPack):
+                            drops_list[d_owner].equip()
+                        else:
+                            heretic.inventory.append(drops_list[d_owner])
                         picked_up = active_font.render('Я подобрал ' + drops_list[d_owner].type, True, (0, 0, 0))
-                        heretic.inventory.append(drops_list[d_owner])
                         drops_list.pop(d_owner)
-                    elif current_location == 'leftside':
+                    elif My_classes.Farmetic_classes.current_location == 'leftside':
+                        if isinstance(leftside_drops_list[d_owner], BackPack):
+                            leftside_drops_list[d_owner].equip()
+                        else:
+                            heretic.inventory.append(leftside_drops_list[d_owner])
                         picked_up = active_font.render('Я подобрал ' + leftside_drops_list[d_owner].type, True,
                                                        (0, 0, 0))
-                        heretic.inventory.append(leftside_drops_list[d_owner])
                         leftside_drops_list.pop(d_owner)
+                    drop_active = None
 
                 elif current_interface != 'none':
-                    if current_interface == 'Chest':
+                    if isinstance(current_interface, Storage):
                         if event.pos[0] < 600:
                             index = (event.pos[0] - 50) // 150 + (event.pos[1] - 100) // 150 * 4
-                            put_item_in_the_storage(chest, index)
+                            if current_interface.description[-1] == 'Пусто':
+                                current_interface.description.pop()
+                            if len(current_interface.storage) < current_interface.max_capability:
+                                current_interface.description.append(heretic.inventory[index].type + ';')
+                            put_item_in_the_storage(current_interface, index)
+
                         elif event.pos[0] > 820:
                             index = (event.pos[0] - 820) // 150 + (event.pos[1] - 100) // 150 * 4
-                            chest.take_from_storage(index)
+                            current_interface.take_from_storage(index)
+                            current_interface.description.pop()
+                            if len(current_interface.description) < 3:
+                                current_interface.description.append('Пусто')
+                    elif current_interface == 'furnace':
+                        index = (event.pos[0] - 50) // 150 + ((event.pos[1] - 100) // 150 * 4)
+                        if not current_attached and index < len(heretic.inventory):
+                            current_attached = heretic.inventory.pop(index)
+                        elif isinstance(current_attached, Fuel) and 800 <= event.pos[0] <= 930 and 530 <= event.pos[1] <= 660:
+                            furnace.fuel += current_attached.energy
+                            current_attached = None
+                        elif isinstance(current_attached, Meltable) and 800 <= event.pos[0] <= 930 and 380 <= event.pos[1] <= 530:
+                            furnace.melt_something(current_attached.type)
+                            current_attached = None
+                        elif not current_attached and 1100 <= event.pos[0] <= 1230 and 380 <= event.pos[1] <= 510 \
+                                and len(heretic.inventory) < 20:
+                            heretic.inventory.append(furnace.product)
+                            furnace.product = None
+                        elif current_attached:
+                            heretic.inventory.append(current_attached)
+                            current_attached = None
 
-                elif inventory_mode and len(heretic.inventory) > 0:
+                    elif current_interface == 'gridstone':
+                        if 10 <= event.pos[0] <= 310:
+                            recipy = (event.pos[1] - 10) // 110 + current_mean
+                            if recipy == 0:
+                                gridstone.status = 'sharpened stone'
+                                gridstone.product = SharpenedStone(0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0)
+                            elif recipy == 3:
+                                gridstone.status = 'pickaxe'
+                                gridstone.product = PickAxe(0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0)
+                            elif recipy == 4:
+                                gridstone.status = 'shovel'
+                                gridstone.product = Shovel(0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0)
+                            elif recipy == 5:
+                                gridstone.status = 'crate'
+                                gridstone.product = Crate(0, 0, 0, 0, 0, 0, 0, 0, 'Ящик')
+                            elif recipy == 6:
+                                gridstone.status = 'bag'
+                                gridstone.product = Bag(0, 0, 0, 0, 0, 0, 0, 0, 'Сумка')
+                        elif 720 <= event.pos[0] <= 970 and 700 <= event.pos[1] <= 800:
+                            gridstone.produce_tools(gridstone.status)
+
+                        elif 335 <= event.pos[0] <= 365:
+                            if 20 <= event.pos[1] <= 50 and current_mean:
+                                current_mean -= 1
+                            if 850 <= event.pos[1] <= 880 and current_mean < len(gridstone_recipes) - 8:
+                                current_mean += 1
+
+                if 990 <= event.pos[0] <= 1090 and 245 <= event.pos[1] <= 345 and heretic.backpack and My_classes.Farmetic_classes.inventory_mode:
+                    current_interface = heretic.backpack
+
+                elif My_classes.Farmetic_classes.inventory_mode and len(heretic.inventory):
+
                     x = random.randint(heretic.x - 50, heretic.x + 100)
                     y = random.randint(heretic.y + 10, heretic.y + 120)
                     index = (event.pos[0] - 50) // 150 + ((event.pos[1] - 100) // 150 * 4)
                     try:
-                        heretic.inventory[index].x = x
-                        heretic.inventory[index].y = y
-                        heretic.inventory[index].active_zone = [list(range(x - 150, x + 150)),
-                                                                list(range(y - 150, y + 150))]
+                        if isinstance(heretic.inventory[index], Drop):
+                            heretic.inventory[index].x = x
+                            heretic.inventory[index].y = y
+                            heretic.inventory[index].active_zone = [list(range(x - 150, x + 150)),
+                                                                    list(range(y - 150, y + 150))]
 
-                        if isinstance(heretic.inventory[index], DroppedBerry):
-                            heretic.inventory[index].visible_zone = [list(range(x - 3, x + 50)),
-                                                                     list(range(y - 3, y + 50))]
-                        else:
-                            heretic.inventory[index].visible_zone = [list(range(x - 3, x +
-                                                                                len(heretic.inventory[
-                                                                                        index].visible_zone[0]))),
-                                                                     list(range(y - 3, y +
-                                                                                len(heretic.inventory[
-                                                                                        index].visible_zone[1])))]
-                        if at_home:
-                            home_drops_list.append(heretic.inventory[index])
-                        elif current_location == 'leftside':
-                            leftside_drops_list.append(heretic.inventory[index])
-                        else:
-                            drops_list.append(heretic.inventory[index])
-                        heretic.inventory.pop(index)
+                            if isinstance(heretic.inventory[index], DroppedBerry):
+                                heretic.inventory[index].visible_zone = [list(range(x - 3, x + 50)),
+                                                                         list(range(y - 3, y + 50))]
+                            else:
+                                heretic.inventory[index].visible_zone = [list(range(x - 3, x +
+                                                                                    len(heretic.inventory[index].visible_zone[0]))),
+                                                                         list(range(y - 3, y +
+                                                                                    len(heretic.inventory[
+                                                                                            index].visible_zone[1])))]
+
+                            if My_classes.Farmetic_classes.at_home:
+                                home_drops_list.append(heretic.inventory[index])
+                            elif My_classes.Farmetic_classes.current_location == 'leftside':
+                                leftside_drops_list.append(heretic.inventory[index])
+                            else:
+                                drops_list.append(heretic.inventory[index])
+                            if isinstance(heretic.inventory[index], Storage):
+                                heretic.inventory[index].location = heretic.location
+
+                            heretic.inventory.pop(index)
                     except IndexError:
                         print('IndexError has been caught!')
 
             elif event.button == 3:
-                if 825 <= event.pos[0] <= 925 and 245 <= event.pos[1] <= 345 and heretic.weapon != 'none':
+                if 825 <= event.pos[0] <= 925 and 245 <= event.pos[1] <= 345 and heretic.weapon != 'none' and My_classes.Farmetic_classes.inventory_mode:
                     heretic.weapon.unequip()
+                elif 990 <= event.pos[0] <= 1090 and 245 <= event.pos[1] <= 345 and heretic.backpack and My_classes.Farmetic_classes.inventory_mode:
+                    x = random.randint(heretic.x - 50, heretic.x + 100)
+                    y = random.randint(heretic.y + 10, heretic.y + 120)
+                    heretic.backpack.x = x
+                    heretic.backpack.y = y
+                    heretic.backpack.active_zone = [list(range(x - 150, x + 150)),
+                                                    list(range(y - 150, y + 150))]
+                    heretic.backpack.visible_zone = [list(range(x, x + 50)),
+                                                     list(range(y, y + 70))]
+                    (drops_list if heretic.location == 'home' else leftside_drops_list).append(heretic.backpack)
+                    heretic.backpack = None
                 else:
                     x = random.randint(heretic.x - 50, heretic.x + 120)
                     y = random.randint(heretic.y + 50, heretic.y + 120)
@@ -367,9 +453,10 @@ while game:
                     try:
                         if isinstance(heretic.inventory[index], Eatable) or isinstance(heretic.inventory[index], Berry):
                             heretic.inventory[index].eat()
-                            remark_time = 90
-                            current_string = random.choice(['Вкусно', heretic.inventory[index].type + '! М-м-м',
-                                                            "Объедение"])
+                            My_classes.Farmetic_classes.remark_time = 90
+                            My_classes.Farmetic_classes.current_string = random.choice(
+                                ['Вкусно', heretic.inventory[index].type + '! М-м-м',
+                                 "Объедение"])
                             eat_time = 90
                             if not isinstance(heretic.inventory[index], Berry):
                                 energy_boost = '+ ' + str(heretic.inventory[index].energy)
@@ -378,16 +465,19 @@ while game:
                             heretic.inventory.pop(index)
 
                         elif isinstance(heretic.inventory[index], Pine):
-                            if current_location == 'home':
+                            if My_classes.Farmetic_classes.current_location == 'home':
                                 trees_list.append(Sapling(x, y, 0, [[0], [0]]))
                                 heretic.inventory.pop(index)
                             else:
-                                current_string = "Почва не подходит"
-                                remark_time = 100
+                                My_classes.Farmetic_classes.current_string = "Почва не подходит"
+                                My_classes.Farmetic_classes.remark_time = 100
 
                         elif isinstance(heretic.inventory[index], Weapon):
                             if heretic.weapon == 'none':
                                 heretic.inventory[index].equip()
+
+                        elif isinstance(heretic.inventory[index], Crate):
+                            heretic.inventory[index].set()
 
                     except IndexError:
                         print('IndexError has been caught!')
@@ -400,8 +490,8 @@ while game:
             if event.key == pygame.K_e:
 
                 try:
-                    if home_active and not at_home:
-                        at_home = True
+                    if home_active and not My_classes.Farmetic_classes.at_home:
+                        My_classes.Farmetic_classes.at_home = True
                         heretic.direction = 'up'
                         heretic.x = 700
                         heretic.y = 500
@@ -415,66 +505,99 @@ while game:
                         heretic.y = 165
                         heretic.direction = 'up'
 
-                    elif at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
-                        at_home = False
+                    elif My_classes.Farmetic_classes.at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
+                        My_classes.Farmetic_classes.at_home = False
                         heretic.direction = 'down'
                         heretic.x = home.x + 75
                         heretic.y = home.y + 60
 
-                    elif current_location == 'home' and heretic.x in sign_to_leftside.active_zone[0] \
+                    elif My_classes.Farmetic_classes.current_location == 'home' and heretic.x in \
+                            sign_to_leftside.active_zone[0] \
                             and heretic.y in sign_to_leftside.active_zone[1]:
-                        sign_to_leftside.read()
+                        current_interface = sign_to_leftside
+                        sign_surf.fill((128, 128, 128))
 
-                    elif current_location == 'leftside' and heretic.x in sign_to_home.active_zone[0] \
+                    elif My_classes.Farmetic_classes.current_location == 'leftside' and heretic.x in \
+                            sign_to_home.active_zone[0] \
                             and heretic.y in sign_to_home.active_zone[1]:
-                        sign_to_home.read()
+                        current_interface = sign_to_home
+                        sign_surf.fill((128, 128, 128))
 
-                    elif active and len(bushes_list[b_owner].berries) > 0 and (not heretic.is_tired or god_mode) \
-                            and len(heretic.inventory) < 20 and not at_home:
+                    elif My_classes.Farmetic_classes.current_location == 'leftside' and heretic.x in torch.active_zone[
+                        0] \
+                            and heretic.y in torch.active_zone[1]:
+                        torch.light()
+
+                    elif isinstance(heretic.weapon,
+                                    Shovel) and heretic.health and not My_classes.Farmetic_classes.at_home:
+                        heretic.weapon.dig()
+
+                    elif active and len(bushes_list[b_owner].berries) > 0 and (
+                            not heretic.is_tired or My_classes.Farmetic_classes.god_mode) \
+                            and len(heretic.inventory) < 20 and not My_classes.Farmetic_classes.at_home:
                         bushes_list[b_owner].berries.pop(random.randint(0, len(bushes_list[b_owner].berries)))
                         heretic.inventory.append(DroppedBerry(0, 0, [[], []], [[], []], 'Ягода',
                                                               ['Вкусная спелая ягода'], random.randint(6, 8)))
                         heretic.health -= random.randint(1, 3)
 
-                    elif at_home and drop_active and len(heretic.inventory) < 20 and not inventory_mode and \
+                    elif My_classes.Farmetic_classes.at_home and drop_active and len(heretic.inventory) < 20 \
+                            and not My_classes.Farmetic_classes.inventory_mode and \
                             current_interface == 'none':
-                        remark_time = 60
-                        current_string = 'Я подобрал ' + home_drops_list[d_owner].type
-                        heretic.inventory.append(home_drops_list[d_owner])
-                        home_drops_list.pop(d_owner)
+                        My_classes.Farmetic_classes.remark_time = 60
+                        My_classes.Farmetic_classes.current_string = 'Я подобрал ' + home_drops_list[d_owner].type
+                        if isinstance(home_drops_list[d_owner], BackPack):
+                            home_drops_list[d_owner].equip()
+                            home_drops_list.pop(d_owner)
+                        else:
+                            heretic.inventory.append(home_drops_list.pop(d_owner))
 
-                    elif (active or chopping_active) and heretic.health <= 0 and remark_time <= 0:
-                        remark_time = 60
-                        current_string = random.choice(['Я очень устал', "Нет сил", "Нужно отдохнуть"])
+                    elif (
+                            active or chopping_active) and heretic.health <= 0 and My_classes.Farmetic_classes.remark_time <= 0:
+                        My_classes.Farmetic_classes.remark_time = 60
+                        My_classes.Farmetic_classes.current_string = random.choice(
+                            ['Я очень устал', "Нет сил", "Нужно отдохнуть"])
 
-                    elif at_home and heretic.x in juicemaker.active_zone[0] and heretic.y in juicemaker.active_zone[1] \
+                    elif My_classes.Farmetic_classes.at_home and heretic.x in juicemaker.active_zone[0] and heretic.y in \
+                            juicemaker.active_zone[1] \
                             and juicemaker.work_time <= -1:
                         if len([i for i in heretic.inventory if
                                 isinstance(i, Berry) or isinstance(i, DroppedBerry)]) >= 4:
-                            current_string = 'Сок скоро будет готов'
-                            remark_time = 60
+                            My_classes.Farmetic_classes.current_string = 'Сок скоро будет готов'
+                            My_classes.Farmetic_classes.remark_time = 60
                             juicemaker.make_juice()
 
                         else:
-                            current_string = 'Нужно больше ягод'
-                            remark_time = 60
+                            My_classes.Farmetic_classes.current_string = 'Нужно больше ягод'
+                            My_classes.Farmetic_classes.remark_time = 60
 
-                    elif at_home and heretic.x in furnace.active_zone[0] and heretic.y in furnace.active_zone[1] \
-                            and furnace.work_time <= -1:
-                        furnace.make_meat()
+                    elif My_classes.Farmetic_classes.at_home and heretic.x in furnace.active_zone[0] and heretic.y in \
+                            furnace.active_zone[1]:
+                        open('furnace')
 
-                    elif at_home and heretic.x in chest.active_zone[0] and heretic.y in chest.active_zone[1] and \
+                    elif My_classes.Farmetic_classes.at_home and heretic.x in chest.active_zone[0] and heretic.y in \
+                            chest.active_zone[1] and \
                             current_interface == 'none':
-                        open("Chest")
-                    elif at_home and heretic.x in gridstone.active_zone[0] and heretic.y in gridstone.active_zone[1] and \
+                        open(chest)
+
+                    elif crate_owner:
+                        open(crate_owner)
+                    elif My_classes.Farmetic_classes.at_home and heretic.x in gridstone.active_zone[0] and heretic.y in \
+                            gridstone.active_zone[1] and \
                             current_interface == 'none':
                         open("gridstone")
                         gridstone.work()
 
-                    elif chopping_active and inactive_time < 0 and (0 < heretic.health or god_mode):
+                    elif chopping_active and inactive_time < 0 and (
+                            0 < heretic.health or My_classes.Farmetic_classes.god_mode) \
+                            and not heretic.attack_time and not My_classes.Farmetic_classes.at_home:
+                        if heretic.x < trees_list[t_owner].x - 10:
+                            heretic.direction = "right"
+                        elif heretic.x > trees_list[t_owner].x + 50:
+                            heretic.direction = 'left'
                         trees_list[t_owner].chop()
+                        heretic.attack_time = 30
                         inactive_time = 5
-                        if not god_mode:
+                        if not My_classes.Farmetic_classes.god_mode:
                             heretic.health -= random.randint(2, 4)
                         chopping_sound_1.play()
                         if trees_list[t_owner].health <= 0:
@@ -486,7 +609,7 @@ while game:
                                                              [k for k in range(y - 120, y + 180)]],
                                                       [[k for k in range(x - 8, x + 85)],
                                                        [j for j in range(y, y + 50)]],
-                                                      "Бревно", ['Необработанное бревно'], 0))
+                                                      "Бревно", ['Необработанное бревно'], random.randint(5, 7)))
                             for i in range(random.randint(1, 2)):
                                 x = random.choice(trees_list[t_owner].active_zone[0])
                                 y = random.choice(trees_list[t_owner].active_zone[1])
@@ -494,7 +617,8 @@ while game:
                                                               [k for k in range(y - 120, y + 180)]],
                                                        [[k for k in range(x - 8, x + 55)], [j for j in range(y - 5,
                                                                                                              y + 50)]],
-                                                       "Желудь", ['Когда-то из него', "вырастет дерево"], 0))
+                                                       "Желудь", ['Когда-то из него', "вырастет дерево"],
+                                                       random.randint(1, 3)))
                             stick_chance = random.randint(0, 2)
                             if not stick_chance:
                                 x = random.choice(trees_list[t_owner].active_zone[0])
@@ -505,15 +629,18 @@ while game:
                                                                                                               y + 50)]],
                                                         "Палка", ['Крепкая палка'], 2, 20, 20, 2))
                             trees_list.pop(t_owner)
+                        for i in range(random.randint(3, 4)):
+                            decors_list.append(FallingLeaves(random.choice(trees_list[t_owner].active_zone[0]),
+                                                             random.randint(trees_list[t_owner].y - 200,
+                                                                            trees_list[t_owner].y + 125), "down", 60))
 
-                    elif rock_owner and rock_owner.health and heretic.health:
+                    elif rock_owner and rock_owner.health and heretic.health and not heretic.attack_time:
+                        rock_owner.be_broken()
                         if not isinstance(heretic.weapon, PickAxe):
-                            if not god_mode:
+                            if not My_classes.Farmetic_classes.god_mode:
                                 heretic.health -= random.randint(4, 6)
                         else:
                             heretic.weapon.mine(rock_owner)
-                        if not heretic.attack_time:
-                            rock_owner.be_broken()
 
                 except IndexError:
                     print('IndexError is caught!')
@@ -521,14 +648,14 @@ while game:
                     '''
 Открытие/закрытие инвентаря
             '''
-            elif event.key == pygame.K_i:
-                if inventory_mode:
-                    inventory_mode = False
+            elif event.key == pygame.K_i and current_interface == 'none':
+                if My_classes.Farmetic_classes.inventory_mode:
+                    My_classes.Farmetic_classes.inventory_mode = False
                     chosen_item = None
                 else:
-                    inventory_mode = True
+                    My_classes.Farmetic_classes.inventory_mode = True
 
-            elif event.key == pygame.K_d and inventory_mode:
+            elif event.key == pygame.K_d and My_classes.Farmetic_classes.inventory_mode:
                 try:
                     if pos[0] < 650:
                         pos_index_d = (pos[0] - 50) // 150 + (pos[1] - 100) // 150 * 4
@@ -537,16 +664,18 @@ while game:
                 except IndexError:
                     print('IndexError has been caught!')
 
-            elif event.key == pygame.K_ESCAPE and current_location != 'menu':
+            elif event.key == pygame.K_ESCAPE and My_classes.Farmetic_classes.current_location != 'menu':
                 going_to_menu += 1
-                current_location = 'menu'
+                My_classes.Farmetic_classes.current_location = 'menu'
 
     '''
 Движение
     '''
     keys = pygame.key.get_pressed()
-    if not inventory_mode and not sleeping and current_location != 'menu' and current_location != 'settings':
-        if keys[pygame.K_a] and (heretic.x > -3 and not at_home or at_home and 300 <= heretic.x):
+    if not My_classes.Farmetic_classes.inventory_mode and not sleeping and My_classes.Farmetic_classes.current_location != 'menu' \
+            and My_classes.Farmetic_classes.current_location != 'settings':
+        if keys[pygame.K_a] and (heretic.x > -3 and not My_classes.Farmetic_classes.at_home or
+                                 My_classes.Farmetic_classes.at_home and 300 <= heretic.x):
             if on_path:
                 heretic.x -= 8
             elif heretic.is_tired:
@@ -555,7 +684,8 @@ while game:
                 heretic.x -= 5
 
             heretic.direction = 'left'
-        elif keys[pygame.K_d] and (heretic.x < 1367 and not at_home or at_home and 1020 >= heretic.x):
+        elif keys[pygame.K_d] and (heretic.x < 1367 and not My_classes.Farmetic_classes.at_home or
+                                   My_classes.Farmetic_classes.at_home and 1020 >= heretic.x):
             heretic.direction = 'right'
             if on_path:
                 heretic.x += 7
@@ -564,7 +694,8 @@ while game:
             else:
                 heretic.x += 5
 
-        if keys[pygame.K_w] and (heretic.y > 0 and not at_home or at_home and heretic.y > 150):
+        if keys[pygame.K_w] and (heretic.y > 0 and not My_classes.Farmetic_classes.at_home or
+                                 My_classes.Farmetic_classes.at_home and heretic.y > 150):
             if on_path:
                 heretic.y -= 7
             elif heretic.is_tired:
@@ -573,7 +704,8 @@ while game:
                 heretic.y -= 4
             heretic.direction = 'up'
 
-        elif keys[pygame.K_s] and (heretic.y < 800 and not at_home or at_home and heretic.y < 501):
+        elif keys[pygame.K_s] and (heretic.y < 800 and not My_classes.Farmetic_classes.at_home
+                                   or My_classes.Farmetic_classes.at_home and heretic.y < 501):
             heretic.direction = 'down'
             if on_path:
                 heretic.y += 5
@@ -582,7 +714,8 @@ while game:
             else:
                 heretic.y += 4
 
-        if any([keys[pygame.K_a], keys[pygame.K_w], keys[pygame.K_a], keys[pygame.K_d]]) and not at_home:
+        if any([keys[pygame.K_a], keys[pygame.K_w], keys[pygame.K_a],
+                keys[pygame.K_d]]) and not My_classes.Farmetic_classes.at_home:
             if not tick % 30:
                 if heretic.direction in ['left', 'right']:
                     decors_list.append(Steps(random.randint(heretic.x + 10, heretic.x + 50), heretic.y + 80,
@@ -590,17 +723,18 @@ while game:
                 else:
                     decors_list.append(Steps(random.randint(heretic.x + 10, heretic.x + 50), heretic.y + 80,
                                              random.randint(12, 16), random.randint(24, 30), random.randint(100, 120)))
-            if current_location == 'leftside':
+            if My_classes.Farmetic_classes.current_location == 'leftside':
                 if not random.randint(0, 250):
                     for i in range(random.randint(2, 5)):
                         leftside_decors_list.append(Powder(random.randint(heretic.x, heretic.x + 50),
-                                                           random.randint(heretic.y + 50, heretic.y + 120), random.choice(['left', 'right']) + ' up', 70))
+                                                           random.randint(heretic.y + 50, heretic.y + 120),
+                                                           random.choice(['left', 'right']) + ' up', 70))
 
     """
     Перемещение
     """
-    if current_location == 'home' and heretic.x < 10:
-        current_location = 'leftside'
+    if My_classes.Farmetic_classes.current_location == 'home' and heretic.x < 10:
+        My_classes.Farmetic_classes.current_location = 'leftside'
         active = False
         tp_to_left_side = False
         drop_active = False
@@ -612,8 +746,8 @@ while game:
         heretic.x = 1350
         heretic.direction = 'left'
         volume = 0
-    elif current_location == 'leftside' and heretic.x > 1350:
-        current_location = 'home'
+    elif My_classes.Farmetic_classes.current_location == 'leftside' and heretic.x > 1350:
+        My_classes.Farmetic_classes.current_location = 'home'
         active = False
         tp_to_left_side = False
         drop_active = False
@@ -626,7 +760,7 @@ while game:
         heretic.direction = 'right'
         volume = 0
 
-    if current_location == 'menu':
+    if My_classes.Farmetic_classes.current_location == 'menu':
         display.fill((188, 252, 240))
         for i in menu_decors_list:
             pygame.draw.rect(display, (200, 200, 200), (i.x, i.y, i.width, i.height))
@@ -676,28 +810,23 @@ while game:
             pygame.draw.rect(display, (255, 255, 255), (190, 350, 50, 50))
             pygame.draw.rect(display, (0, 0, 0), (210, 370, 10, 10))
 
-    elif current_location == 'settings':
+    elif My_classes.Farmetic_classes.current_location == 'settings':
         display.fill((188, 252, 240))
         display.blit(title_font.render('Настройки', True, (0, 0, 0)), (350, 10))
-        display.blit(inventory_font.render('Кровь', True, (0, 0, 0)), (100, 200))
-        display.blit(inventory_font.render('Режим Бога', True, (0, 0, 0)), (100, 330))
-        pygame.draw.rect(display, (0, 0, 0), (600, 250, 150, 50))
-        if blood_setting:
-            pygame.draw.rect(display, (0, 200, 0), (610, 255, 40, 40))
-        else:
-            pygame.draw.rect(display, (200, 0, 0), (700, 255, 40, 40))
-
-        pygame.draw.rect(display, (0, 0, 0), (600, 380, 150, 50))
-        if god_mode:
-            pygame.draw.rect(display, (0, 200, 0), (610, 385, 40, 40))
-        else:
-            pygame.draw.rect(display, (200, 0, 0), (700, 385, 40, 40))
+        for i in range(len(settings.keys())):
+            display.blit(inventory_font.render(list(settings.keys())[i], True, (0, 0, 0)), (100, 200 + i * 130))
+            pygame.draw.rect(display, (0, 0, 0), (600, 230 + 125 * i, 150, 50))
+            pygame.draw.rect(display, (0, 0, 0), (600, 230 + 125 * i, 150, 50))
+            if settings.get(list(settings.keys())[i]):
+                pygame.draw.rect(display, (0, 200, 0), (610, 230 + 130 * i, 40, 40))
+            else:
+                pygame.draw.rect(display, (200, 0, 0), (700, 230 + 130 * i, 40, 40))
 
     elif current_interface != 'none':
-        if current_interface == 'Chest':
+        if isinstance(current_interface, Storage):
             display.fill((184, 173, 118))
             display.blit(inventory_font.render('Инвентарь', True, (0, 0, 0)), (120, 10))
-            display.blit(inventory_font.render('Сундук', True, (0, 0, 0)), (1000, 10))
+            display.blit(inventory_font.render(current_interface.type, True, (0, 0, 0)), (1000, 10))
             for i in range(50, 601, 150):
                 for j in range(100, 701, 150):
                     pygame.draw.rect(display, (0, 0, 200), (i, j, 130, 130))
@@ -734,40 +863,43 @@ while game:
                 elif isinstance(heretic.inventory[i], PickAxe):
                     heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
             for i in range(820, 1271, 150):
-                for j in range(100, 701, 150):
+                for j in range(100, 101 + (current_interface.max_capability - 1) // 4 * 150, 150):
                     pygame.draw.rect(display, (0, 0, 200), (i, j, 130, 130))
                     pygame.draw.rect(display, (190, 190, 190), (i + 15, j + 15, 100, 100))
+            try:
+                for i in range(len(current_interface.storage)):
+                    if isinstance(current_interface.storage[i], DroppedBerry):
+                        current_interface.storage[i].draw_object(870 + 150 * (i % 4), 140 + 150 * (i // 4))
 
-            for i in range(len(chest.storage)):
-                if isinstance(chest.storage[i], Berry) or isinstance(chest.storage[i], DroppedBerry):
-                    chest.storage[i].draw_object(870 + 150 * (i % 4), 140 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Log):
+                        current_interface.storage[i].draw_object(845 + 150 * (i % 4), 130 + 150 * (i // 4))
 
-                elif isinstance(chest.storage[i], Log):
-                    chest.storage[i].draw_object(845 + 150 * (i % 4), 130 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Pine):
+                        current_interface.storage[i].draw_object(850 + 150 * (i % 4), 130 + 150 * (i // 4))
 
-                elif isinstance(chest.storage[i], Pine):
-                    chest.storage[i].draw_object(850 + 150 * (i % 4), 130 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Juice):
+                        current_interface.storage[i].draw_object(860 + 150 * (i % 4), 140 + 150 * (i // 4))
 
-                elif isinstance(chest.storage[i], Juice):
-                    chest.storage[i].draw_object(860 + 150 * (i % 4), 140 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], RawMeat):
+                        current_interface.storage[i].draw_object(850 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(chest.storage[i], RawMeat):
-                    chest.storage[i].draw_object(850 + 150 * (i % 4), 150 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Meat):
+                        current_interface.storage[i].draw_object(850 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(chest.storage[i], Meat):
-                    chest.storage[i].draw_object(850 + 150 * (i % 4), 150 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Stone):
+                        current_interface.storage[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], Stick):
-                    chest.storage[i].draw_object(880 + 150 * (i % 4), 130 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], SharpenedStone):
+                        current_interface.storage[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], Stone):
-                    heretic.inventory[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], PickAxe):
+                        current_interface.storage[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], SharpenedStone):
-                    heretic.inventory[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
+                    elif isinstance(current_interface.storage[i], Drop):
+                        current_interface.storage[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], PickAxe):
-                    heretic.inventory[i].draw_object(860 + 150 * (i % 4), 150 + 150 * (i // 4))
+            except IndexError as e:
+                print(e)
 
             pygame.draw.line(display, (161, 96, 54), (700, 0), (700, 900), 100)
 
@@ -790,6 +922,11 @@ while game:
         elif current_interface == 'gridstone':
             display.fill((184, 173, 118))
             pygame.draw.line(display, (0, 0, 0), (350, 0), (350, 900), 40)
+            if current_mean:
+                pygame.draw.polygon(display, (150, 66, 45), ((335, 50), (350, 20), (365, 50)))
+            if current_mean < len(gridstone_recipes) - 8:
+                pygame.draw.polygon(display, (150, 66, 45), ((335, 850), (350, 880), (365, 850)))
+
             display.blit(title_font.render('Точило', True, (0, 0, 0)), (720, 40))
             for i in range(500, 781, 140):
                 for j in range(250, 531, 140):
@@ -807,14 +944,89 @@ while game:
             for i in range(10, 781, 110):
                 pygame.draw.rect(display, (0, 0, 0), (10, i, 300, 100))
                 pygame.draw.rect(display, (184, 173, 118), (15, i + 5, 290, 90))
-                if i // 110 < len(gridstone_recipes):
-                    display.blit(active_font.render(gridstone_recipes[i // 110], True, (0, 0, 0)), (20, i + 30))
+                if i // 110 + current_mean < len(gridstone_recipes):
+                    display.blit(active_font.render(gridstone_recipes[i // 110 + current_mean], True, (0, 0, 0)),
+                                 (20, i + 30))
             if gridstone.status != 'off':
-                pygame.draw.rect(display, (0, 0, 0), (720, 700, 250, 100))
-                pygame.draw.rect(display, (200, 0, 0), (725, 705, 240, 90))
-                display.blit(active_font.render("Крафт", True, (0, 0, 0)), (760, 720))
+                if gridstone.status == 'not enough resources':
+                    display.blit(active_font.render("Недостаточно ресурсов", True, (0, 0, 0)), (670, 720))
+                else:
+                    pygame.draw.rect(display, (0, 0, 0), (720, 700, 250, 100))
+                    pygame.draw.rect(display, (200, 0, 0), (725, 705, 240, 90))
+                    display.blit(active_font.render("Крафт", True, (0, 0, 0)), (760, 720))
 
-    elif inventory_mode:
+        elif current_interface == 'furnace':
+            display.fill((184, 173, 118))
+            pygame.draw.line(display, (0, 0, 0), (680, 0), (680, 900), 40)
+            display.blit(title_font.render('Печь', True, (0, 0, 0)), (920, 40))
+            for i in range(50, 601, 150):
+                for j in range(100, 801, 150):
+                    pygame.draw.rect(display, (0, 0, 200), (i, j, 130, 130))
+                    pygame.draw.rect(display, (190, 190, 190), (i + 15, j + 15, 100, 100))
+            for i in range(len(heretic.inventory)):
+                if isinstance(heretic.inventory[i], Berry) or isinstance(heretic.inventory[i], DroppedBerry):
+                    heretic.inventory[i].draw_object(100 + 150 * (i % 4), 160 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], Log):
+                    heretic.inventory[i].draw_object(75 + 150 * (i % 4), 150 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], Pine):
+                    heretic.inventory[i].draw_object(80 + 150 * (i % 4), 150 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], Juice):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 160 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], RawMeat):
+                    heretic.inventory[i].draw_object(80 + 150 * (i % 4), 170 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], Meat):
+                    heretic.inventory[i].draw_object(80 + 150 * (i % 4), 170 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], Stick):
+                    heretic.inventory[i].draw_object(110 + 150 * (i % 4), 150 + 150 * (i // 4))
+
+                elif any([isinstance(heretic.inventory[i], Stone), isinstance(heretic.inventory[i], IronOre),
+                          isinstance(heretic.inventory[i], Coal)]):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], SharpenedStone):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
+
+                elif isinstance(heretic.inventory[i], PickAxe) or isinstance(heretic.inventory[i], Shovel):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 140 + 150 * (i // 4))
+                elif isinstance(heretic.inventory[i], Storage) or isinstance(heretic.inventory[i], Drop):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 140 + 150 * (i // 4))
+
+            pygame.draw.rect(display, (0, 0, 200), (800, 380, 130, 130))
+            pygame.draw.rect(display, (190, 190, 190), (815, 395, 100, 100))
+            pygame.draw.rect(display, (0, 0, 200), (800, 530, 130, 130))
+            pygame.draw.rect(display, (190, 190, 190), (815, 545, 100, 100))
+            pygame.draw.rect(display, (184, 173, 118), (845, 570, 15, 10))
+            pygame.draw.rect(display, (184, 173, 118), (850, 580, 40, 25))
+
+            pygame.draw.rect(display, (0, 0, 200), (1100, 380, 130, 130))
+            pygame.draw.rect(display, (190, 190, 190), (1115, 395, 100, 100))
+
+            pygame.draw.rect(display, (200, 196, 193), (950, 425, 120, 40))
+            if furnace.work_time:
+                pygame.draw.rect(display, (220, 216, 213), (950, 425, (600 - furnace.work_time) // 5, 40))
+
+            pygame.draw.rect(display, (10, 10, 10), (800, 700, 500, 80))
+            pygame.draw.rect(display, (240, 240, 240), (810, 705, 480, 70))
+            pygame.draw.rect(display, (125, 71, 43), (810, 705, furnace.fuel * 5, 70))
+            display.blit(active_font.render("Топливо", True, (0, 0, 0)), (920, 790))
+
+            if isinstance(current_attached, Drop):
+                current_attached.draw_object(pos[0], pos[1])
+            if isinstance(furnace.product, Drop):
+                furnace.product.draw_object(1130, 410)
+            for i in range(800, 1300, 50):
+                if not i % 100 and i > 800:
+                    pygame.draw.line(display, (0, 0, 0), (i - 5, 760), (i - 5, 775), 10)
+                elif not i % 50 and i > 800:
+                    pygame.draw.line(display, (0, 0, 0), (i - 4, 765), (i - 4, 775), 8)
+
+    elif My_classes.Farmetic_classes.inventory_mode:
 
         display.fill((184, 173, 118))
         display.blit(inventory_font.render('Инвентарь', True, (0, 0, 0)), (120, 10))
@@ -824,15 +1036,27 @@ while game:
         pygame.draw.rect(display, (200, 0, 0), (810, 155, int(445 * heretic.health // 100), 50))
         pygame.draw.rect(display, (0, 0, 200), (810, 230, 130, 130))
         pygame.draw.rect(display, (190, 190, 190), (825, 245, 100, 100))
+        pygame.draw.rect(display, (0, 0, 200), (970, 230, 130, 130))
+        pygame.draw.rect(display, (190, 190, 190), (985, 245, 100, 100))
         if heretic.weapon != 'none':
             heretic.weapon.draw_object(865, 260)
             display.blit(active_font.render(heretic.weapon.type, True, (0, 0, 0)), (825, 365))
-
         else:
             pygame.draw.rect(display, (184, 173, 118), (860, 260, 20, 45))
             pygame.draw.polygon(display, (184, 173, 118), ((860, 260), (870, 252), (880, 260)))
             pygame.draw.rect(display, (184, 173, 118), (850, 300, 40, 6))
             pygame.draw.rect(display, (184, 173, 118), (864, 306, 12, 20))
+
+        if heretic.backpack:
+            heretic.backpack.draw_object(1000, 260)
+            display.blit(active_font.render(heretic.backpack.type, True, (0, 0, 0)), (960, 365))
+        else:
+            pygame.draw.rect(display, (184, 173, 118), (1000, 260, 50, 70))
+            pygame.draw.lines(display, (184, 173, 118), True, ((1000, 260), (1040, 245), (1060, 270)), 8)
+            pygame.draw.polygon(display, (184, 173, 118),
+                                ((998, 260), (998, 285), (1025, 295), (1052, 285), (1052, 260)))
+
+            pygame.draw.circle(display, (184, 173, 118), (1035, 289), 3)
 
         pygame.draw.line(display, (161, 96, 54), (700, 0), (700, 900), 100)
         pygame.draw.line(display, (0, 0, 0), (1025 + 120 * day_tick // 550, 110), (1200 + 120 * day_tick // 550, 110),
@@ -871,14 +1095,17 @@ while game:
                 elif isinstance(heretic.inventory[i], Stick):
                     heretic.inventory[i].draw_object(110 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], Stone):
+                elif any([isinstance(heretic.inventory[i], Stone), isinstance(heretic.inventory[i], IronOre),
+                          isinstance(heretic.inventory[i], Coal)]):
                     heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
 
                 elif isinstance(heretic.inventory[i], SharpenedStone):
                     heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
 
-                elif isinstance(heretic.inventory[i], PickAxe):
-                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 150 + 150 * (i // 4))
+                elif isinstance(heretic.inventory[i], PickAxe) or isinstance(heretic.inventory[i], Shovel):
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 140 + 150 * (i // 4))
+                else:
+                    heretic.inventory[i].draw_object(90 + 150 * (i % 4), 140 + 150 * (i // 4))
 
             if 100 < pos[0] < 650 and pos[1] > 100:
                 pos_index = (pos[0] - 50) // 150 + (pos[1] - 100) // 150 * 4
@@ -892,9 +1119,10 @@ while game:
         except IndexError:
             print('IndexError has been caught!')
 
-    elif at_home:
+    elif My_classes.Farmetic_classes.at_home:
         display.fill((0, 0, 0))
         if not sleeping:
+
             pygame.draw.rect(display, (184, 173, 118), (300, 150, 800, 450))
             pygame.draw.rect(display, (160, 160, 160), (600, 480, 200, 110))
             display.blit(active_font.render('Welcome', True, (0, 0, 0)), (615, 515))
@@ -922,27 +1150,9 @@ while game:
 
             '''
 Отрисовка гриля
+            
             '''
-            pygame.draw.line(display, (170, 161, 161), (furnace.x + 30, furnace.y + 65),
-                             (furnace.x + 10, furnace.y + 90), 15)
-            pygame.draw.line(display, (170, 161, 161), (furnace.x + 70, furnace.y + 65),
-                             (furnace.x + 90, furnace.y + 90), 15)
-            pygame.draw.ellipse(display, (142, 47, 41), (furnace.x, furnace.y, 100, 75))
-            pygame.draw.ellipse(display, (0, 0, 0), (furnace.x + 5, furnace.y + 5, 90, 50))
-            if furnace.status == 'on':
-                pygame.draw.ellipse(display, (216, 118, 49), (furnace.x + 10, furnace.y + 8, 80, 44))
-            for i in range(furnace.y + 10, furnace.y + 46, 7):
-                if i == furnace.y + 10 or i == furnace.y + 45:
-                    pygame.draw.line(display, (170, 161, 161), (furnace.x + 30, i), (furnace.x + 70, i), 4)
-                elif i == furnace.y + 17 or i == furnace.y + 38:
-                    pygame.draw.line(display, (170, 161, 161), (furnace.x + 10, i), (furnace.x + 90, i), 4)
-                else:
-                    pygame.draw.line(display, (170, 161, 161), (furnace.x + 5, i), (furnace.x + 95, i), 4)
-            if furnace.status == 'meat':
-                pygame.draw.ellipse(display, (168, 33, 0), (furnace.x + 15, furnace.y + 10, 70, 40))
-            elif furnace.status == 'on':
-                pygame.draw.ellipse(display, (168 - (600 - furnace.work_time) // 7, 33 - (600 - furnace.work_time)
-                                              // 20, 0), (furnace.x + 15, furnace.y + 10, 70, 40))
+            furnace.draw_object(furnace.x, furnace.y)
 
             chest.draw_object()
             if heretic.y >= gridstone.y:
@@ -961,23 +1171,23 @@ while game:
             if heretic.y < gridstone.y:
                 gridstone.draw_object()
 
-        if active and inactive_time < 0 and not at_home:
+        if active and inactive_time < 0 and not My_classes.Farmetic_classes.at_home:
             display.blit(collect_berry, (heretic.x - 100, heretic.y - 75))
-        elif remark_time > 0:
-            print_on_screen(current_string)
-        elif at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
+        elif My_classes.Farmetic_classes.remark_time > 0:
+            print_on_screen(My_classes.Farmetic_classes.current_string)
+        elif 450 <= heretic.y < 600 <= heretic.x <= 750:
             display.blit(exit_home, (heretic.x - 25, heretic.y - 75))
-        elif at_home and heretic.x in juicemaker.active_zone[0] and heretic.y in juicemaker.active_zone[1]:
+        elif heretic.x in juicemaker.active_zone[0] and heretic.y in juicemaker.active_zone[1]:
             display.blit(juicemaker_sign, (heretic.x - 100, heretic.y - 75))
         elif drop_active and inactive_time < 0:
             display.blit(pick_up, (heretic.x - 60, heretic.y - 75))
-        elif at_home and heretic.x in furnace.active_zone[0] and heretic.y in furnace.active_zone[1]:
+        elif heretic.x in furnace.active_zone[0] and heretic.y in furnace.active_zone[1]:
             display.blit(active_font.render('Гриль', True, (200, 0, 0)), (heretic.x - 20, heretic.y - 75))
-        elif at_home and heretic.x in chest.active_zone[0] and heretic.y in chest.active_zone[1]:
+        elif heretic.x in chest.active_zone[0] and heretic.y in chest.active_zone[1]:
             display.blit(active_font.render('Сундук', True, (200, 0, 0)), (heretic.x - 35, heretic.y - 75))
-        elif at_home and heretic.x in gridstone.active_zone[0] and heretic.y in gridstone.active_zone[1]:
+        elif heretic.x in gridstone.active_zone[0] and heretic.y in gridstone.active_zone[1]:
             display.blit(active_font.render('Точило', True, (200, 0, 0)), (heretic.x - 35, heretic.y - 75))
-        elif chopping_active and not at_home and len(trees_list) > 0:
+        elif chopping_active and not My_classes.Farmetic_classes.at_home and len(trees_list) > 0:
             display.blit(chopping, (heretic.x - 40, heretic.y - 75))
 
         elif go_to_bed and not sleeping:
@@ -1001,7 +1211,7 @@ while game:
             else:
                 drop_active = False
 
-    elif current_location == 'home':
+    elif My_classes.Farmetic_classes.current_location == 'home':
         display.fill((0, 200 - day_tick // 8, 0))
         '''
         for zone in ground_light_zone:
@@ -1051,7 +1261,7 @@ while game:
                     bush.berries.append(Berry(random.randint(bush.x, bush.x + 90), random.randint(bush.y, bush.y + 90),
                                               'Ягода', ['Спелая сочная ягода']))
                     bush.regrowth_time = 450
-            if bush.y > heretic.y + 40 and not at_home and current_location == 'home' \
+            if bush.y > heretic.y + 40 and not My_classes.Farmetic_classes.at_home and My_classes.Farmetic_classes.current_location == 'home' \
                     and heretic.x in bush.active_zone[0]:
                 continue
             if bush.x not in heretic.light_zone[0] or bush.y not in heretic.light_zone[1]:
@@ -1061,6 +1271,14 @@ while game:
             pygame.draw.rect(display, colour, (bush.x, bush.y, 100, 100))
             for ber in bush.berries:
                 pygame.draw.rect(display, (200, 0, 0), (ber.x, ber.y, 10, 10))
+
+        for crate in crates_list:
+            if crate.y < heretic.y + 40 and crate.location == heretic.location:
+                crate.draw_object(crate.x, crate.y)
+
+        for grass in regrowing_list:
+            if grass.y <= 40 + heretic.y and grass.location == heretic.location:
+                grass.draw_object(grass.x, grass.y)
 
         '''
 Вход в зону куста
@@ -1115,6 +1333,16 @@ while game:
         else:
             m_owner = None
 
+        '''
+Вход в зону ящика
+        '''
+        for crate in crates_list:
+            if heretic.x in crate.active_zone[0] and heretic.y in crate.active_zone[1]:
+                crate_owner = crate
+                break
+        else:
+            crate_owner = None
+
             '''
 Анимация предмета
         '''
@@ -1138,24 +1366,26 @@ while game:
                         trees_list.pop(tree)
 
                 elif isinstance(trees_list[tree], Sapling):
-                    if trees_list[tree].health < 500:
-                        pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x, trees_list[tree].y, 20, 60))
-                        pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x - 30, trees_list[tree].y + 20, 30,
-                                                                  10))
-                    elif 1000 >= trees_list[tree].health >= 500:
+                    pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x - trees_list[tree].health // 120,
+                                                              trees_list[tree].y - trees_list[tree].health // 9, 20 +
+                                                              trees_list[tree].health // 60,
+                                                              60 + trees_list[tree].health // 130))
+                    # pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x - 30, trees_list[tree].y + 20, 30, 10))
+                    '''if 1000 >= trees_list[tree].health >= 500:
                         pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x, trees_list[tree].y - 60, 25, 120))
                         pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x - 40, trees_list[tree].y + 30, 40,
                                                                   15))
                         pygame.draw.rect(display, (137, 88, 36), (trees_list[tree].x - 40, trees_list[tree].y, 15, 30))
                         pygame.draw.ellipse(display, (40, 122, 36), (trees_list[tree].x - 60, trees_list[tree].y - 10,
-                                                                     40, 40))
+                                                                     40, 40))'''
                     trees_list[tree].health += 1
                     if trees_list[tree].health >= 1800:
                         trees_list[tree].regrowth()
                         trees_list.pop(tree)
 
                 else:
-                    if trees_list[tree].y > heretic.y + 45 and not at_home and current_location == 'home':
+                    if trees_list[tree].y > heretic.y + 45 \
+                            and not My_classes.Farmetic_classes.at_home and My_classes.Farmetic_classes.current_location == 'home':
                         continue
                     pygame.draw.rect(display, (137, 99, 36), (trees_list[tree].x, trees_list[tree].y - 150, 50, 200))
                     pygame.draw.circle(display, (40, 122, 36), (trees_list[tree].x + 25, trees_list[tree].y - 130), 75)
@@ -1191,7 +1421,7 @@ while game:
             home_active = True
         else:
             home_active = False
-        if not inventory_mode:
+        if not My_classes.Farmetic_classes.inventory_mode:
 
             '''
 Отрисовка существ
@@ -1224,7 +1454,7 @@ while game:
                             if heretic.x in mob.active_zone[0] and heretic.y in mob.active_zone[1]:
                                 pygame.draw.rect(display, (0, 0, 0), (mob.x + 5, mob.y - 30, 50, 20))
                                 pygame.draw.rect(display, (200, 0, 0),
-                                                 (mob.x + 7, mob.y - 28, int(46.0 * mob.health / 10.0), 16))
+                                                 (mob.x + 7, mob.y - 28, int(46.0 * mob.health / 8.0), 16))
 
                         if mob.direction == 'down':
                             pygame.draw.rect(display, mob_head_colour, (mob.x + 15, mob.y + 50, 30, 30))
@@ -1245,11 +1475,12 @@ while game:
                     mob.bleed()
 
             for fog in decors_list:
-                if isinstance(fog, FallingBlood):
+                if isinstance(fog, Particles):
                     fog.fly()
                     fog.draw_object(fog.x, fog.y)
                     fog.life_time -= 1
-                    fog.fall()
+                    if isinstance(fog, FallingBlood):
+                        fog.fall()
                 elif isinstance(fog, Fog) and fog.y < heretic.y - 40:
                     if fog.x in heretic.light_zone[0] and fog.y in heretic.light_zone[1]:
                         fog_colour = (200, 200, 200)
@@ -1272,7 +1503,8 @@ while game:
                 pygame.draw.rect(display, (0, 0, 0), (90, 395, 50, 30))
                 pygame.draw.polygon(display, (0, 0, 0), ((70, 410), (90, 390), (90, 430)))
             for bush in bushes_list:
-                if bush.y > heretic.y + 40 and not at_home and current_location == 'home' and heretic.x in \
+                if bush.y > heretic.y + 40 and not My_classes.Farmetic_classes.at_home \
+                        and My_classes.Farmetic_classes.current_location == 'home' and heretic.x in \
                         bush.active_zone[0]:
                     if bush.x not in heretic.light_zone[0] or bush.y not in heretic.light_zone[1]:
                         colour = (0, 100 - day_tick // 20, 0)
@@ -1282,7 +1514,15 @@ while game:
                     for ber in bush.berries:
                         pygame.draw.rect(display, (200, 0, 0), (ber.x, ber.y, 10, 10))
 
-            if home.y > heretic.y and not at_home and current_location == 'home':
+            for crate in crates_list:
+                if crate.y > heretic.y + 40 and crate.location == heretic.location:
+                    crate.draw_object(crate.x, crate.y)
+
+            for grass in regrowing_list:
+                if grass.y > 40 + heretic.y and grass.location == heretic.location:
+                    grass.draw_object(grass.x, grass.y)
+
+            if home.y > heretic.y and not My_classes.Farmetic_classes.at_home and My_classes.Farmetic_classes.current_location == 'home':
                 pygame.draw.rect(display, (155 - day_tick // 10, 166 - day_tick // 10, 165 - day_tick // 10),
                                  (x_home, y_home, h_length, h_width))
                 for i in range(len(home.light_zones)):
@@ -1293,7 +1533,8 @@ while game:
                 pygame.draw.rect(display, (163, 121, 41), (x_home + 75, y_home + 50, 100, 130))
             try:
                 for tree in range(len(trees_list)):
-                    if trees_list[tree].y > heretic.y + 45 and not at_home and current_location == 'home':
+                    if trees_list[tree].y > heretic.y + 45 and not My_classes.Farmetic_classes.at_home \
+                            and My_classes.Farmetic_classes.current_location == 'home':
                         if isinstance(trees_list[tree], Stump):
                             pygame.draw.rect(display, (137, 99, 36), (trees_list[tree].x, trees_list[tree].y, 50, 50))
                             pygame.draw.ellipse(display, (155, 136, 70), (trees_list[tree].x, trees_list[tree].y - 10,
@@ -1306,7 +1547,7 @@ while game:
                                         if trees_list[tree2].y < trees_list[tree1].y:
                                             trees_list[tree1], trees_list[tree2] = trees_list[tree2], trees_list[tree1]
 
-                        elif not at_home and not isinstance(trees_list[tree], Sapling):
+                        elif not My_classes.Farmetic_classes.at_home and not isinstance(trees_list[tree], Sapling):
                             pygame.draw.rect(display, (137, 99, 36),
                                              (trees_list[tree].x, trees_list[tree].y - 150, 50, 200))
                             pygame.draw.circle(display, (40, 122, 36),
@@ -1337,28 +1578,33 @@ Tелепортация
             else:
                 tp_to_left_side = False
 
-            if home_active and not at_home:
+            if home_active and not My_classes.Farmetic_classes.at_home:
                 display.blit(enter, (heretic.x - 25, heretic.y - 75))
 
-            elif tp_to_left_side and not at_home:
+            elif tp_to_left_side and not My_classes.Farmetic_classes.at_home:
                 display.blit(leftside_tp, (heretic.x - 50, heretic.y - 75))
 
-            elif remark_time > 0:
-                print_on_screen(current_string)
+            elif My_classes.Farmetic_classes.remark_time > 0:
+                print_on_screen(My_classes.Farmetic_classes.current_string)
+                print(My_classes.Farmetic_classes.current_string)
 
-            elif m_owner is not None:
+            elif m_owner:
                 display.blit(active_font.render('Атаковать', True, (0, 0, 0)), (heretic.x - 50, heretic.y - 75))
 
-            elif at_home and heretic.x in juicemaker.active_zone[0] and heretic.y in juicemaker.active_zone[1]:
+            elif crate_owner:
+                display.blit(active_font.render('Открыть', True, (0, 0, 0)), (heretic.x - 50, heretic.y - 75))
+
+            elif My_classes.Farmetic_classes.at_home and heretic.x in juicemaker.active_zone[0] and heretic.y in \
+                    juicemaker.active_zone[1]:
                 display.blit(juicemaker_sign, (heretic.x - 100, heretic.y - 75))
 
-            elif active and inactive_time < 0 and not at_home:
+            elif active and inactive_time < 0 and not My_classes.Farmetic_classes.at_home:
                 display.blit(collect_berry, (heretic.x - 100, heretic.y - 75))
 
-            elif at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
+            elif My_classes.Farmetic_classes.at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
                 display.blit(exit_home, (heretic.x - 25, heretic.y - 75))
 
-            elif chopping_active and not at_home and len(trees_list) > 0:
+            elif chopping_active and not My_classes.Farmetic_classes.at_home and len(trees_list) > 0:
                 display.blit(chopping, (heretic.x - 40, heretic.y - 75))
 
             elif picked_up_time > 0:
@@ -1378,13 +1624,13 @@ Tелепортация
                 display.blit(active_font.render('Подобрать', True, (0, 0, 0)), (pos[0] - 100, pos[1]))
 
             for mob in mobs_list:
-                if mob.remark_time > 0:
+                if mob.remark_time and mob.location == heretic.location:
                     print_for_mob(mob, mob.remark)
 
         '''
     Лефт-Сайд
 '''
-    elif current_location == 'leftside':
+    elif My_classes.Farmetic_classes.current_location == 'leftside':
 
         display.fill((115 - day_tick // 10, 125 - day_tick // 10, 120 - day_tick // 10))
         torch.work()
@@ -1427,6 +1673,19 @@ Tелепортация
         else:
             if rock_owner:
                 rock_owner = None
+
+        '''
+        Вход в зону ящиков
+        '''
+        for crate in crates_list:
+            if crate.location == heretic.location and heretic.x in crate.active_zone[0] and heretic.y in crate.active_zone[1]:
+                crate_owner = crate
+                break
+
+        else:
+            if rock_owner:
+                rock_owner = None
+
         """
 Лефт-Сайд:блок отрисовки предметов
 """
@@ -1442,26 +1701,32 @@ Tелепортация
         for rock in leftside_stones_list:
             if isinstance(rock, Rock) and heretic.y - 10 > rock.y:
                 rock.draw_object()
+        try:
+            for fog in leftside_decors_list:
+                if isinstance(fog, Fog) and fog.y < heretic.y - 40:
+                    if fog.x in heretic.light_zone[0] and fog.y in heretic.light_zone[1]:
+                        fog_colour = (200, 200, 200)
+                    else:
+                        fog_colour = (200 - day_tick // 10, 200 - day_tick // 10, 200 - day_tick // 10)
+                    fog_surf = pygame.Surface((fog.width, fog.height))
+                    fog_surf.fill(fog_colour)
+                    fog_surf.set_alpha(140)
+                    display.blit(fog_surf, (fog.x, fog.y))
 
-        for fog in leftside_decors_list:
-            if isinstance(fog, Fog) and fog.y < heretic.y - 40:
-                if fog.x in heretic.light_zone[0] and fog.y in heretic.light_zone[1]:
-                    fog_colour = (200, 200, 200)
-                else:
-                    fog_colour = (200 - day_tick // 10, 200 - day_tick // 10, 200 - day_tick // 10)
-                fog_surf = pygame.Surface((fog.width, fog.height))
-                fog_surf.fill(fog_colour)
-                fog_surf.set_alpha(140)
-                display.blit(fog_surf, (fog.x, fog.y))
+                elif isinstance(fog, Flashes):
+                    fog.draw_object(fog.x, fog.y)
+                    fog.fly()
+                    fog.life_time -= 1
+                    if fog.life_time == 15:
+                        fog.direction.replace("up", "down")
+                    if not fog.life_time:
+                        leftside_decors_list.remove(fog)
 
-            elif isinstance(fog, Flashes):
-                fog.draw_object(fog.x, fog.y)
-                fog.fly()
-                fog.life_time -= 1
-                if fog.life_time == 15:
-                    fog.direction.replace("up", "down")
-                if not fog.life_time:
-                    leftside_decors_list.remove(fog)
+                elif isinstance(fog, Particles) and fog in leftside_decors_list:
+                    fog.draw_object(fog.x, fog.y)
+                    fog.fly()
+        except ValueError as e:
+            print(e.args)
 
         for mob in mobs_list:
             if mob.location == 'leftside':
@@ -1478,7 +1743,7 @@ Tелепортация
         else:
             m_owner = None
 
-        if not inventory_mode:
+        if not My_classes.Farmetic_classes.inventory_mode:
             for mob in mobs_list:
                 if mob.location == 'leftside':
                     if isinstance(mob, PeacefulMobs):
@@ -1534,7 +1799,7 @@ Tелепортация
         for i in decors_list:
             if isinstance(i, Smoke):
                 pygame.draw.rect(display, (210, 10, 10), (i.x, i.y, i.width, i.height))
-                if not game_tick % 20:
+                if not My_classes.Farmetic_classes.game_tick % 20:
                     i.fly()
                 i.life_time -= 1
                 if not i.life_time:
@@ -1562,13 +1827,9 @@ Tелепортация
         pygame.draw.rect(display, (200, 0, 0), (heretic.x - 10, heretic.y - 28,
                                                 int(100.0 * float(heretic.health) // 100.0), 21))
 
-        if active and inactive_time < 0 and not at_home:
-            display.blit(collect_berry, (heretic.x - 100, heretic.y - 75))
-        elif at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
-            display.blit(exit_home, (heretic.x - 25, heretic.y - 75))
-        elif rock_owner:
+        if rock_owner:
             display.blit(active_font.render("Добывать", True, (0, 0, 0)), (heretic.x - 40, heretic.y - 75))
-        elif chopping_active and not at_home and len(trees_list) > 0:
+        elif chopping_active and not My_classes.Farmetic_classes.at_home and len(trees_list) > 0:
             display.blit(chopping, (heretic.x - 40, heretic.y - 75))
         elif drop_active and inactive_time < 0:
             display.blit(pick_up, (heretic.x - 60, heretic.y - 75))
@@ -1578,45 +1839,29 @@ Tелепортация
         '''
 Телепортация
         '''
-        if 1250 <= heretic.x <= 1400 and 400 <= heretic.y <= 550:
-            tp_to_home = True
-        else:
-            tp_to_home = False
-
-        if home_active and not at_home:
-            display.blit(enter, (heretic.x - 25, heretic.y - 75))
-
-        elif tp_to_left_side and not at_home:
-            display.blit(leftside_tp, (heretic.x - 50, heretic.y - 75))
-
-        elif tp_to_home:
-            display.blit(home_tp, (heretic.x - 20, heretic.y - 75))
-
-        elif active and inactive_time < 0 and not at_home:
+        if 1250 <= heretic.x <= 1400 and 450 <= heretic.y <= 550:
+            display.blit(active_font.render("К дому", True, (0, 0, 0)), (heretic.x - 100, heretic.y - 75))
+        if active and inactive_time < 0 and not My_classes.Farmetic_classes.at_home:
             display.blit(collect_berry, (heretic.x - 100, heretic.y - 75))
 
-        elif at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
+        elif My_classes.Farmetic_classes.at_home and 450 <= heretic.y < 600 <= heretic.x <= 750:
             display.blit(exit_home, (heretic.x - 25, heretic.y - 75))
 
-        elif chopping_active and not at_home and len(trees_list) > 0:
+        elif chopping_active and not My_classes.Farmetic_classes.at_home and len(trees_list) > 0:
             display.blit(chopping, (heretic.x - 40, heretic.y - 75))
 
-        elif drop_active and inactive_time < 0:
-            display.blit(pick_up, (heretic.x - 60, heretic.y - 75))
-
-        elif picked_up_time > 0:
-            display.blit(picked_up, (heretic.x - 100, heretic.y - 75))
 
     pygame.display.update()
     clock.tick(60)
 
-    if current_location in ['home', 'leftside'] or inventory_mode or at_home:
+    if My_classes.Farmetic_classes.current_location in ['home', 'leftside'] or \
+            My_classes.Farmetic_classes.inventory_mode or My_classes.Farmetic_classes.at_home:
         inactive_time -= 1
-        game_tick += 1
+        My_classes.Farmetic_classes.game_tick += 1
         eat_time -= 1
         #  drop_appear_tick -= 1
         picked_up_time -= 1
-        remark_time -= 1
+        My_classes.Farmetic_classes.remark_time -= 1
 
     #  if drop_appear_tick < 0 and len(drops_list) < 5:
     # x = random.randint(100, 1300)
@@ -1627,14 +1872,14 @@ Tелепортация
     if not menu_tick % 30 and menu_tick <= 210:
         title += FARMETIC[menu_tick // 30]
 
-    if current_location == 'menu':
+    if My_classes.Farmetic_classes.current_location == 'menu':
         menu_tick += 1
         menu_fog_tick = random.randint(0, 400)
         if not menu_fog_tick:
             menu_decors_list.append(Fog(-100, random.randint(100, 600), random.randint(50, 100),
                                         random.randint(50, 100), 2000))
 
-    if sleeping and game_tick % 15 == 0:
+    if sleeping and not My_classes.Farmetic_classes.game_tick % 15:
         heretic.health += random.randint(2, 5)
         if z_z_Z == 'z z z ':
             z_z_Z = ''
@@ -1644,9 +1889,9 @@ Tелепортация
             sleeping = False
             heretic.direction = 'down'
             heretic.health = 100
-            current_string = 'Я отлично выспался'
-            remark_time = 90
-    if current_location != 'menu' and current_location != 'settings':
+            My_classes.Farmetic_classes.current_string = 'Я отлично выспался'
+            My_classes.Farmetic_classes.remark_time = 90
+    if My_classes.Farmetic_classes.current_location != 'menu' and My_classes.Farmetic_classes.current_location != 'settings':
         if heretic.health < 0:
             heretic.health = 0
         if sleeping and not tick % 3:
@@ -1672,21 +1917,20 @@ Tелепортация
     if isinstance(heretic.weapon, Weapon) and heretic.weapon.blood_marks:
         heretic.weapon.blood_mark()
 
-    if 900 < tick <= 2700 and not tick % 90:
+    if 900 < tick <= 2700 and not tick % 100:
         x = random.randint(100, 1400)
         y = random.randint(100, 800)
         fog_col = random.randint(3, 6)
         for i in range(fog_col):
             decors_list.append(Fog(random.randint(x - 50, x + 70), random.randint(y - 50, y + 50),
                                    random.randint(120, 180), random.randint(40, 100), random.randint(120, 180)))
-            leftside_decors_list.append(Fog(random.randint(x - 50, x + 70), random.randint(y - 50, y + 50),
-                                            random.randint(120, 180), random.randint(50, 100),
-                                            random.randint(130, 200)))
+            leftside_decors_list.append(Fog(-200, random.randint(y - 50, y + 50),
+                                            random.randint(120, 180), random.randint(50, 100), 3500))
     try:
         for i in range(len(decors_list)):
             decors_list[i].life_time -= 1
             if isinstance(decors_list[i], Fog):
-                if game_tick % 2:
+                if My_classes.Farmetic_classes.game_tick % 2:
                     decors_list[i].fly()
             elif isinstance(decors_list[i], Blood):
                 if decors_list[i].life_time >= 540 and not decors_list[i].life_time % 10:
@@ -1698,13 +1942,13 @@ Tелепортация
                 # noinspection PyUnresolvedReferences
                 decors_list[i].fall()
 
-            if decors_list[i].life_time == 0:
+            if not decors_list[i].life_time:
                 decors_list.pop(i)
 
         for i in range(len(leftside_decors_list)):
             leftside_decors_list[i].life_time -= 1
             if isinstance(leftside_decors_list[i], Fog):
-                if game_tick % 2:
+                if My_classes.Farmetic_classes.game_tick % 2:
                     leftside_decors_list[i].fly()
             elif isinstance(leftside_decors_list[i], Blood):
                 if leftside_decors_list[i].life_time >= 540 and not leftside_decors_list[i].life_time % 10:
@@ -1748,12 +1992,12 @@ Tелепортация
         rock.regenerate()
 
     if heretic.poison_time == 540:
-        remark_time = 60
-        current_string = random.choice(['Мне нехорошо', 'Живот болит', 'Я слабею'])
+        My_classes.Farmetic_classes.remark_time = 60
+        My_classes.Farmetic_classes.current_string = random.choice(['Мне нехорошо', 'Живот болит', 'Я слабею'])
 
     if not heretic.health and not heretic.is_tired:
-        current_string = random.choice(['Черт', 'Я изнурен', 'Нет сил'])
-        remark_time = 60
+        My_classes.Farmetic_classes.current_string = random.choice(['Черт', 'Я изнурен', 'Нет сил'])
+        My_classes.Farmetic_classes.remark_time = 60
         heretic.is_tired = True
         try:
             for i in heretic.inventory:
@@ -1770,10 +2014,10 @@ Tелепортация
                     else:
                         i.visible_zone = [list(range(x - 3, x + len(i.visible_zone[0]))), list(range(y - 3, y +
                                                                                                      len(i.visible_zone[
-                                                                                                            1])))]
-                    if current_location == 'home':
+                                                                                                             1])))]
+                    if My_classes.Farmetic_classes.current_location == 'home':
                         drops_list.append(i)
-                    elif current_location == 'leftside':
+                    elif My_classes.Farmetic_classes.current_location == 'leftside':
                         leftside_drops_list.append(i)
                     heretic.inventory.remove(i)
         except (ValueError, IndexError) as e:
@@ -1784,33 +2028,39 @@ Tелепортация
     juicemaker.work()
     furnace.work()
     juicemaker.produce_juice()
-    if not furnace.work_time:
-        furnace.produce_meat()
+
     for i in mobs_list:
         if isinstance(i, PeacefulMobs):
             i.peaceful_exist()
         elif isinstance(i, AggressiveMobs):
-            if len([j for j in mobs_list if isinstance(j, PeacefulMobs) and j.location == i.location]) or heretic.health > 0:
+            if len([j for j in mobs_list if
+                    isinstance(j, PeacefulMobs) and j.location == i.location]) or heretic.health > 0:
                 i.agressive_exist()
             else:
                 i.peaceful_exist()
     if not random.randint(0, 800):
         produce_new_peaceful_mob()
-    if random.randint(1, 1200) == 2 and 1800 <= tick <= 3000 and len([k for k in mobs_list if isinstance(k, PeacefulMobs)]):
+    if My_classes.Farmetic_classes.goblins_spawn and random.randint(1, 1800) == 2 \
+            and 1800 <= tick <= 3000 and len([k for k in mobs_list if isinstance(k, PeacefulMobs)]):
         produce_new_aggressive_mob()
+
+    for grass in regrowing_list:
+        if isinstance(grass, HighGrass):
+        #    grass.flutter()
+            pass
     heretic.be_poisoned()
     if heretic.attack_time:
         heretic.attack_time -= 1
-    if current_location != heretic.location:
-        heretic.location = current_location
+    if My_classes.Farmetic_classes.current_location != heretic.location:
+        heretic.location = My_classes.Farmetic_classes.current_location
     if not volume:
-        if current_location == 'leftside':
-            pygame.mixer.music.load(r"C:\Users\User\Desktop\Farmetic-master\Leftside Track.mp3")
+        if My_classes.Farmetic_classes.current_location == 'leftside':
+            pygame.mixer.music.load(r"C:\Users\User\PycharmProjects\ClearSheet\Leftside Track.mp3")
             pygame.mixer.music.play(-1)
-        elif current_location == 'home':
-            pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
+        elif My_classes.Farmetic_classes.current_location == 'home':
+            pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
             pygame.mixer.music.play(-1)
         volume = 80
-    if not game_tick:
-        current_string = ["Давай исследовать", "Привет, я Еретик"]
-        remark_time = 119
+    if not My_classes.Farmetic_classes.game_tick:
+        My_classes.Farmetic_classes.current_string = ["Давай исследовать", "Привет, я Еретик"]
+        My_classes.Farmetic_classes.remark_time = 119
