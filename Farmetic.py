@@ -59,12 +59,12 @@ def close():
 
 
 volume = 80
-pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
 pygame.mixer.music.play(-1)
 pygame.mixer.music.set_volume(volume)
-chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\PycharmProjects\ClearSheet\chopping sound 1.wav')
-sword_image = pygame.image.load("sword.png")
-crate_image = pygame.image.load("crate.png").convert_alpha()
+chopping_sound_1 = pygame.mixer.Sound(r'C:\Users\User\Desktop\Farmetic-master\chopping sound 1.wav')
+sword_image = pygame.image.load(r"C:\Users\User\Desktop\Farmetic-master\sword.png")
+crate_image = pygame.image.load(r"C:\Users\User\Desktop\Farmetic-master\crate.png").convert_alpha()
 crate_image = pygame.transform.scale(crate_image, (crate_image.get_width() * 2, crate_image.get_height() * 2))
 
 directions = ['vert', 'gor']
@@ -339,7 +339,7 @@ while game:
                             index = (event.pos[0] - 50) // 150 + (event.pos[1] - 100) // 150 * 4
                             if current_interface.description[-1] == 'Пусто':
                                 current_interface.description.pop()
-                            if len(current_interface.storage) < current_interface.max_capability:
+                            if len(current_interface.storage) < current_interface.max_capability and index < len(heretic.inventory):
                                 current_interface.description.append(heretic.inventory[index].type + ';')
                             put_item_in_the_storage(current_interface, index)
 
@@ -2055,10 +2055,10 @@ Tелепортация
         heretic.location = My_classes.Farmetic_classes.current_location
     if not volume:
         if My_classes.Farmetic_classes.current_location == 'leftside':
-            pygame.mixer.music.load(r"C:\Users\User\PycharmProjects\ClearSheet\Leftside Track.mp3")
+            pygame.mixer.music.load(r"C:\Users\User\Desktop\Farmetic-master\Leftside Track.mp3")
             pygame.mixer.music.play(-1)
         elif My_classes.Farmetic_classes.current_location == 'home':
-            pygame.mixer.music.load(r'C:\Users\User\PycharmProjects\ClearSheet\Home track.mp3')
+            pygame.mixer.music.load(r'C:\Users\User\Desktop\Farmetic-master\Home track.mp3')
             pygame.mixer.music.play(-1)
         volume = 80
     if not My_classes.Farmetic_classes.game_tick:
